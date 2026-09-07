@@ -1,5 +1,5 @@
-import { callerTty } from "pixel-terminals";
-import type { Terminal } from "pixel-terminals";
+import { callerTty } from "terminal-electron/terminal";
+import type { Terminal } from "terminal-electron/terminal";
 import { INTEROP_PROTOCOL_VERSIONS, listInteropInstances } from "pixel-store";
 import type { InteropInstance, OpenSpec } from "pixel-store";
 
@@ -31,9 +31,7 @@ export async function findHosts(terminal: Terminal | null): Promise<InteropInsta
   );
   return answers
     .filter((record): record is InteropInstance => record !== null)
-    .sort((a, b) =>
-      a.mode === b.mode ? b.startedAt - a.startedAt : a.mode === "browser" ? -1 : 1,
-    );
+    .sort((a, b) => b.startedAt - a.startedAt);
 }
 
 export function openInHost(socket: string, spec: OpenSpec): Promise<{ tab: number }> {

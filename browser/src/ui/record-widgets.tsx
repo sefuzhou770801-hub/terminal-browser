@@ -1,5 +1,5 @@
-import { Box, Text } from "pixel-react";
-import type { Rgba } from "pixel-react";
+import { Box, Text } from "terminal-electron";
+import type { Rgba } from "terminal-electron";
 import type { Rect } from "../record/model";
 import { Icon } from "./icons";
 import { mix, withAlpha } from "./theme";

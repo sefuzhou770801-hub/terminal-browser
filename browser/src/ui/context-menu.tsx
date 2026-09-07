@@ -1,4 +1,4 @@
-import { Box, Image, Path, Text } from "pixel-react";
+import { Box, Image, Path, Text } from "terminal-electron";
 import type { Theme } from "./theme";
 import type { ChromeActions, ChromeLayout, PageMenuIcon, PageMenuItem, PageMenuView } from "./types";
 

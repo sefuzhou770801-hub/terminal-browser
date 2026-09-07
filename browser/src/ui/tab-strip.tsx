@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Box, Image, Text } from "pixel-react";
+import { Box, Image, Text } from "terminal-electron";
 import { displayUrl } from "../url";
 import { Icon } from "./icons";
 import { usePulse } from "./pulse";
@@ -149,9 +149,7 @@ export function TabStrip({
   const pointerIn = useRef(false);
   const dotPulse = usePulse(tabs.some((tab) => tab.agentControlled && !tab.active));
   const label = (tab: TabRow) =>
-    tab.active && !tab.app
-      ? activeLabel || tab.title || "new tab"
-      : tab.title || (tab.app ? "app" : "new tab");
+    tab.active ? activeLabel || tab.title || "new tab" : tab.title || "new tab";
   const charW = rem * 0.82 * 0.6;
   const slotW = rem * 0.85;
   const padX = rem * 0.7;
@@ -239,9 +237,7 @@ export function TabStrip({
               flexShrink: tab.active && !ghost ? 1 : 0,
               overflow: "hidden",
             }}
-            onClick={() =>
-              tab.active && !tab.app ? actions.urlEdit() : actions.tabSwitch(tab.id)
-            }
+            onClick={() => (tab.active ? actions.urlEdit() : actions.tabSwitch(tab.id))}
             onMouseEnter={() => setHovered(tab.id)}
             onMouseLeave={() => setHovered((id) => (id === tab.id ? null : id))}
           >

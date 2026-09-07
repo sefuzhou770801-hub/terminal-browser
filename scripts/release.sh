@@ -16,20 +16,18 @@ case "$(uname -s)-$(uname -m)" in
 esac
 
 rm -rf "$OUT"
-mkdir -p "$STAGE"/{bin,cli/dist,browser/dist,browser/native,electron,agent-browser/bin,assets/fonts,scripts}
+mkdir -p "$STAGE"/{bin,cli/dist,browser/dist,electron,agent-browser/bin,assets/fonts,scripts}
 
-(cd "$ROOT/engine" && cargo build -p pixel-node --release)
-if [ -n "$DARWIN_ARCH" ]; then
-  NATIVE_LIB=libpixel_node.dylib
-else
-  NATIVE_LIB=libpixel_node.so
+# terminal-electron resolves its engine binary and scroll helper from this package at runtime
+NATIVE_PKG="$ROOT/terminal-electron/packages/native/$TARGET"
+if [ ! -f "$NATIVE_PKG/pixel.node" ]; then
+  echo "refusing to build: $NATIVE_PKG has no pixel.node (run: pnpm --filter terminal-electron build:native -- --release)" >&2
+  exit 1
 fi
-cp "${CARGO_TARGET_DIR:-$ROOT/engine/target}/release/$NATIVE_LIB" "$STAGE/browser/native/pixel.node"
-
-# the engine bakes in a path to its build directory, which only exists on this machine
+mkdir -p "$STAGE/browser/node_modules/@terminal-electron"
+cp -RL "$NATIVE_PKG" "$STAGE/browser/node_modules/@terminal-electron/native-$TARGET"
 if [ -n "$DARWIN_ARCH" ]; then
-  swiftc -O -target "$DARWIN_ARCH-apple-macos11" "$ROOT/engine/crates/pixel-core/native-scroll-helper.swift" \
-    -o "$STAGE/bin/native-scroll-helper"
+  cp "$NATIVE_PKG/native-scroll-helper" "$STAGE/bin/native-scroll-helper"
 fi
 
 AGENT_BROWSER_BIN="$("$ROOT/scripts/agent-browser.sh" --path)"
@@ -63,7 +61,6 @@ if [ -n "$DARWIN_ARCH" ]; then
     -c "Set :CFBundleName terminal-browser" \
     -c "Set :CFBundleDisplayName terminal-browser" \
     -c "Set :CFBundleIdentifier dev.zenbu.terminal-browser" \
-    -c "Add :LSUIElement bool true" \
     "$APP/Contents/Info.plist" >/dev/null
   ELECTRON_EXE="electron/terminal-browser.app/Contents/MacOS/terminal-browser"
   NATIVE_SCROLL='export NATIVE_SCROLL_HELPER="${NATIVE_SCROLL_HELPER:-$ROOT/bin/native-scroll-helper}"'

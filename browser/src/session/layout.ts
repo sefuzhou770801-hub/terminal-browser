@@ -1,12 +1,26 @@
-import type { EngineInfo } from "pixel-react";
-import type { DevtoolsDock } from "pixel-store";
-import { snapToCssGrid, type BrowserSurfaceLayout } from "../page/types";
+import type { DevtoolsDock, EngineInfo } from "terminal-electron";
+
+export interface SurfaceLayout {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  scale: number;
+}
+
+function snapToCssGrid(width: number, height: number, scale: number) {
+  const css = {
+    width: Math.max(1, Math.floor(width / scale)),
+    height: Math.max(1, Math.floor(height / scale)),
+  };
+  return { width: Math.round(css.width * scale), height: Math.round(css.height * scale) };
+}
 import type { ChromeLayout } from "../ui/types";
 
 export interface SessionLayout {
   chrome: ChromeLayout;
-  surface: BrowserSurfaceLayout;
-  devtools: BrowserSurfaceLayout | null;
+  surface: SurfaceLayout;
+  devtools: SurfaceLayout | null;
 }
 
 export interface DevtoolsPlacement {

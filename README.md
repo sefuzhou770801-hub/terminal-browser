@@ -84,42 +84,8 @@ The alternative is running terminal-browser directly on the machine you are shh'
 
 
 
-### App Mode
-terminal-browser can be used to build apps in the terminal using browser technology. You can reference `terminal-code` as a production usage example - https://github.com/zenbu-labs/terminal-code
-
-This is accessible by using the `--app-mode` option when spawning terminal-browser, and optionally using the `preload` and `main-script` options that use electron's [preload scripts](https://www.electronjs.org/docs/latest/tutorial/tutorial-preload) and main script under the hood. 
-
-The following options are the full set of app related options available for `terminal-browser open`
-```
-  --preload=<path>      Run a script inside the context of a web page before it loads (uses electron's preload feature under the hood, runs in an isolated world).
-                        terminal-browser specific api's are exposed on globalThis.terminalBrowser
-                        {
-                          theme: () => { background: [r,g,b], foreground: [r,g,b], ansi: ([r,g,b] | null)[] } | null, // null until the terminal reports its colors
-                          onTheme: (cb: (theme: Theme) => void) => () => void, // returns unsubscribe
-                          quit: () => void // closes this browser window
-                        }
-                        --terminal-browser-session=<key> is passed as extra arguments to the renderer process, available via process.argv
-  --main-script=<path>  Run a node.js script in the same process as the browser (this is an electron main process)
-  --open-tabs-in-popup-stack Links that would open a new tab open a popup over the
-                        page instead.
-  --allow-clipboard-read
-                        Lets websites read from clipboard.
-  --no-toolbar          No toolbar or tab strip
-  --no-shortcuts        No browser shortcuts, keys go to the page
-  --no-context-menu     No right-click menu
-  --no-overlays         No toasts or HUDs drawn over the page
-  --no-frame            No border or padding, the page fills the pane
-  --app-mode            Shorthand for --no-toolbar --no-shortcuts
-                        --no-context-menu --no-overlays --no-frame
-                        --allow-clipboard-read --open-tabs-in-popup-stack
-  --ssh-bundle <dir>    Install and execute a bundle on a remote server. This is useful when paired with
-                        --app-mode and --ssh, allowing you to run an application server on a
-                        remote machine, then view the output over ssh
-  --ssh-bundle-dir <dir>
-                        The path --ssh-bundle should be installed to through the ssh server. Defaults to
-                        ${XDG_DATA_HOME:-~/.local/share}/terminal-browser/bundles
-
-```
+### Composing with other terminal-electron apps
+[placeholder copy: terminal-browser is a terminal-electron app, so any other terminal-electron app can share its pane. Register one with `terminal-browser register-app`, then pick it from the command palette: it opens as a tab next to the browser, in the same pane. Apps built for the terminal with browser technology live at https://github.com/zenbu-labs/terminal-electron.]
 
 ### Roadmap
 - linux support ✅

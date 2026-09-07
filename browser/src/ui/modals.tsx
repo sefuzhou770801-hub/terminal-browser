@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Box, Input, Text } from "pixel-react";
-import type { NodeHandle } from "pixel-react";
-import type { BrowserState } from "../page/types";
+import { Box, Input, Text } from "terminal-electron";
+import type { NodeHandle } from "terminal-electron";
+import type { WebViewState } from "terminal-electron";
 import { Icon } from "./icons";
 import type { Theme } from "./theme";
 import type { ChromeActions, ChromeLayout, NewTabView, PaletteView } from "./types";
@@ -154,7 +154,7 @@ export function UrlCard({
   layout,
   theme,
 }: {
-  state: BrowserState;
+  state: WebViewState;
   actions: ChromeActions;
   layout: ChromeLayout;
   theme: Theme;

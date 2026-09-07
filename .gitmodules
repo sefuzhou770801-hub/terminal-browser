@@ -1,0 +1,3 @@
+[submodule "terminal-electron"]
+	path = terminal-electron
+	url = https://github.com/zenbu-labs/terminal-electron.git

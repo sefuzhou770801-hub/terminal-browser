@@ -1,4 +1,12 @@
-import type { DragEvent, PointerEvent, WheelEvent } from "pixel-react";
+import type { RefObject } from "react";
+import type {
+  DownloadProgress,
+  DragEvent,
+  OpenWindowDecision,
+  PointerEvent,
+  WebViewHandle,
+  WebViewState,
+} from "terminal-electron";
 import type { RecordActions } from "../record/types";
 
 export interface PaletteView {
@@ -20,16 +28,7 @@ export interface TabRow {
   title: string;
   favicon: string | null;
   active: boolean;
-  app: boolean;
   agentControlled: boolean;
-}
-
-export interface PopupView {
-  title: string;
-  host: string;
-  loading: boolean;
-  width: number;
-  height: number;
 }
 
 export interface DownloadView {
@@ -63,9 +62,6 @@ export interface ChromeActions {
   urlEdit(): void;
   urlEditCancel(): void;
   urlSubmit(text: string): void;
-  pointer(event: PointerEvent): void;
-  wheel(event: WheelEvent): void;
-  pageHover(hovering: boolean): void;
   findChange(text: string): void;
   findNext(forward: boolean): void;
   findClose(): void;
@@ -80,14 +76,8 @@ export interface ChromeActions {
   newTabSubmit(text: string): void;
   newTabPick(index: number): void;
   newTabCancel(): void;
-  popupPointer(event: PointerEvent): void;
-  popupWheel(event: WheelEvent): void;
-  popupClose(): void;
-  popupHover(hovering: boolean): void;
-  devtoolsPointer(event: PointerEvent): void;
-  devtoolsWheel(event: WheelEvent): void;
-  devtoolsHover(hovering: boolean): void;
   devtoolsDividerDrag(event: DragEvent): void;
+  devtoolsAction(action: "close" | "dock-bottom" | "dock-right"): void;
   devtoolsDividerHover(hovering: boolean): void;
   pageMenuAction(id: string): void;
   pageMenuClose(): void;
@@ -110,4 +100,27 @@ export interface ChromeLayout {
   } | null;
   frame: boolean;
   rem: number;
+}
+
+export interface TabView {
+  id: number;
+  url: string;
+  ref: RefObject<WebViewHandle>;
+  active: boolean;
+  partition: string | null;
+  preload: string | null;
+  clipboardRead: boolean;
+}
+
+export interface TabActions {
+  state(id: number, state: WebViewState): void;
+  openWindow(id: number, details: Electron.HandlerDetails): OpenWindowDecision;
+  contextMenu(id: number, params: Electron.ContextMenuParams): void;
+  download(progress: DownloadProgress): void;
+  pointer(id: number, event: PointerEvent): void;
+}
+
+export interface DevtoolsView {
+  dock: "bottom" | "right";
+  panel: string | null;
 }

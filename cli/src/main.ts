@@ -14,7 +14,6 @@ import {
   registerApp,
   unregisterApp,
 } from "pixel-store";
-import type { OpenSpec } from "pixel-store";
 import {
   callerTty,
   canSplit,
@@ -22,8 +21,9 @@ import {
   checkTerminal,
   detect,
   unsupportedGraphicsMessage,
-} from "pixel-terminals";
-import type { Direction, Terminal, TerminalCheck } from "pixel-terminals";
+} from "terminal-electron/terminal";
+import { findOwner } from "terminal-electron/terminal";
+import type { Direction, Terminal, TerminalCheck } from "terminal-electron/terminal";
 import { actionCommand } from "./action";
 import { control } from "./control";
 import { setupCommand } from "./editors";
@@ -164,7 +164,12 @@ function connectDaemon(): Promise<net.Socket> {
 
 function spawnDaemon() {
   const { command, cwd } = browserLaunchCommand(["--daemon"]);
-  const child = spawn(command[0], command.slice(1), { cwd, detached: true, stdio: "ignore" });
+  // The daemon outlives this pane and serves others; per-pane settings travel
+  // with each session request instead.
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith("TERMINAL_ELECTRON_")),
+  );
+  const child = spawn(command[0], command.slice(1), { cwd, detached: true, stdio: "ignore", env });
   child.unref();
 }
 
@@ -313,7 +318,7 @@ async function kill(pid: number, why: string): Promise<number> {
 }
 
 async function attachHere(argv: string[]): Promise<never> {
-  const tty = ownTtyPath();
+  const tty = process.env.TERMINAL_ELECTRON_TTY ?? ownTtyPath();
   if (!tty) throw new Error("not running on a tty");
   const { socket, reply } = await openSession(argv, tty);
   if (reply.ok === false || !reply.session) {
@@ -480,22 +485,15 @@ async function requireGraphics(check: TerminalCheck) {
 }
 
 const BROWSER_FLAGS = [
-  "--app-mode",
   "--no-toolbar",
   "--no-shortcuts",
   "--no-context-menu",
   "--no-overlays",
   "--no-frame",
-  "--open-tabs-in-popup-stack",
   "--allow-clipboard-read",
-  "--partition=",
   "--ssh=",
   "--ssh-bundle=",
   "--ssh-bundle-dir=",
-  "--preload=",
-  "--main-script=",
-  "--app-name=",
-  "--app-id=",
   "--palette-key=",
   "--find-key=",
   "--devtools-key=",
@@ -553,31 +551,9 @@ async function tryAdopt(args: string[]): Promise<boolean> {
   if (hosts.length === 0) return false;
   const url = args.find((arg) => !arg.startsWith("-"));
   const resolved = url && fs.existsSync(url) ? path.resolve(url) : url;
-  if (!args.includes("--app-mode")) {
-    for (const host of hosts) {
-      try {
-        const opened = await openInHost(host.socket, { url: resolved });
-        print({ adopted: instanceKey(host), socket: host.socket, tab: opened.tab });
-        return true;
-      } catch {}
-    }
-    return false;
-  }
-  if (!resolved) return false;
-  const name = flagEq(args, "--app-name");
-  const idFlag = flagEq(args, "--app-id");
-  const app: NonNullable<OpenSpec["app"]> = { id: appId(idFlag ?? name ?? "app") };
-  if (name !== undefined) app.name = name;
-  const partition = flagEq(args, "--partition");
-  if (partition) app.partition = partition;
-  const preload = flagEq(args, "--preload");
-  if (preload) app.preload = path.resolve(preload);
-  const mainScript = flagEq(args, "--main-script");
-  if (mainScript) app.mainScript = path.resolve(mainScript);
-  const spec: OpenSpec = { url: resolved, app };
   for (const host of hosts) {
     try {
-      const opened = await openInHost(host.socket, spec);
+      const opened = await openInHost(host.socket, { url: resolved });
       print({ adopted: instanceKey(host), socket: host.socket, tab: opened.tab });
       return true;
     } catch {}
@@ -587,6 +563,14 @@ async function tryAdopt(args: string[]): Promise<boolean> {
 
 async function openCommand(args: string[]) {
   requirePaneAccess();
+  // Started from inside another terminal-electron app's pane, or by a program
+  // embedding the browser in its own screen: the browser joins it, so nothing
+  // here may probe or split the terminal.
+  const owned = process.env.TERMINAL_ELECTRON_TTY ?? ownTtyPath();
+  if (process.env.TERMINAL_ELECTRON_EMBED || (owned && findOwner(owned))) {
+    rejectUnknownFlags(args);
+    return openHere(args);
+  }
   const split = takeSplitFlag(args);
   const size = takeSizeFlag(args);
   const noMerge = takeBoolFlag(args, "--no-merge") || mergeDisabled();

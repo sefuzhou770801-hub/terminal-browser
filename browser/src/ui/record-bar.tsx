@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Box, Text } from "pixel-react";
-import type { Rgba } from "pixel-react";
+import { Box, Text } from "terminal-electron";
+import type { Rgba } from "terminal-electron";
 import { measureText } from "../record/model";
 import type { InteractionKind, RecordView } from "../record/types";
 import { recordKeyLabel } from "../session/keybindings";

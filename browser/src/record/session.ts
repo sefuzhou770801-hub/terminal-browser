@@ -6,9 +6,9 @@ import type {
   PointerEvent,
   Surface,
   WheelEvent,
-} from "pixel-react";
-import type { BrowserController } from "../page/controller";
-import { zoomDirection } from "../page/zoom";
+} from "terminal-electron";
+import type { RecordTarget } from "./recorder";
+import { zoomDirection } from "../zoom";
 import { toolbarSize } from "../ui/markup-canvas";
 import { recordBarCluster, recordBarMetrics } from "../ui/record-bar";
 import type { ChromeLayout } from "../ui/types";
@@ -99,7 +99,7 @@ export class RecordSession {
   readonly actions: RecordActions;
 
   private readonly host: RecordHost;
-  readonly controller: BrowserController;
+  readonly target: RecordTarget;
   private readonly recorder: Recorder;
   private readonly markup = new MarkupStore();
 
@@ -147,17 +147,17 @@ export class RecordSession {
   private sampleTimes: number[] | null = null;
   private toolbarGrab: Vec | null = null;
 
-  static async create(host: RecordHost, controller: BrowserController): Promise<RecordSession> {
-    const session = new RecordSession(host, controller);
+  static async create(host: RecordHost, target: RecordTarget): Promise<RecordSession> {
+    const session = new RecordSession(host, target);
     await session.recorder.start();
     return session;
   }
 
-  private constructor(host: RecordHost, controller: BrowserController) {
+  private constructor(host: RecordHost, target: RecordTarget) {
     this.host = host;
-    this.controller = controller;
+    this.target = target;
     this.surface = host.root.createSurface();
-    this.recorder = new Recorder(controller, newRecordingDir(host.page().url));
+    this.recorder = new Recorder(target, newRecordingDir(host.page().url));
     this.recorder.onCap = () => {
       this.host.toast(`recording capped at ${MAX_RECORDING_MS / 60000} minutes`, "done");
       this.stopReview();
@@ -266,6 +266,14 @@ export class RecordSession {
     } catch {}
   }
 
+  private frameSize(): { width: number; height: number } | null {
+    try {
+      return this.target.handle().recording.frameSize();
+    } catch {
+      return null;
+    }
+  }
+
   view(): RecordView {
     const frames = this.recorder.frames;
     const duration = Math.max(1, this.recorder.durationMs());
@@ -299,7 +307,7 @@ export class RecordSession {
       filmstrip: this.stripSurface,
       trim: this.trimRange && { ...this.trimRange },
       frameAspect: (() => {
-        const base = frames[0] ?? this.controller.frameSize();
+        const base = frames[0] ?? this.frameSize();
         if (!base) return 0.625;
         const display = base;
         return display.height / Math.max(1, display.width);

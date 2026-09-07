@@ -1,5 +1,5 @@
-import { Path } from "pixel-react";
-import type { Rgba } from "pixel-react";
+import { Path } from "terminal-electron";
+import type { Rgba } from "terminal-electron";
 
 function arcPath(cx: number, cy: number, r: number, fromDeg: number, toDeg: number): string {
   const rad = (deg: number) => (deg * Math.PI) / 180;

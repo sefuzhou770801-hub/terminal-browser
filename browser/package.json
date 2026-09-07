@@ -4,19 +4,17 @@
   "private": true,
   "main": "dist/main.js",
   "scripts": {
-    "postinstall": "bash ../scripts/fetch-electron.sh && bash ../scripts/copy-react-grab.sh",
+    "postinstall": "node node_modules/terminal-electron/scripts/postinstall.mjs && bash ../scripts/copy-react-grab.sh",
     "build": "tsc -p tsconfig.json",
-    "build:engine": "pnpm --filter pixel-react build",
-    "start": "pnpm build:engine && pnpm build && pnpm --filter terminal-browser-cli build && exec node ../cli/dist/main.js",
+    "start": "pnpm build && pnpm --filter terminal-browser-cli build && exec node ../cli/dist/main.js",
     "typecheck": "tsc --noEmit",
     "test": "tsc -p tsconfig.json && node --test \"test/*.test.js\""
   },
   "dependencies": {
-    "pixel-react": "workspace:*",
     "pixel-store": "workspace:*",
-    "pixel-terminals": "workspace:*",
     "react": "^18.3.1",
-    "react-grab": "0.2.0"
+    "react-grab": "0.2.0",
+    "terminal-electron": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

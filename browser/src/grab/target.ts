@@ -1,7 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { codingAgent, shellLiteral } from "pixel-terminals";
-import type { Pane, PaneDetails, Terminal } from "pixel-terminals";
+import { shellLiteral } from "terminal-electron/terminal";
+import { codingAgent } from "./agents";
+import type { Pane, PaneDetails, Terminal } from "terminal-electron/terminal";
 
 const exec = promisify(execFile);
 
@@ -111,7 +112,9 @@ export class AgentPaneFinder {
     if (!terminal) return null;
     let panes: PaneDetails[] = [];
     try {
-      panes = await withCommands((await terminal.listPanes?.()) ?? []);
+      panes = await withCommands(
+        (await terminal.listPanes?.({ commands: (command) => codingAgent(command) != null })) ?? [],
+      );
     } catch {}
     const self = await this.ctx.self();
     const inTab = (pane: Pane) => self == null || pane.tab === self.tab;

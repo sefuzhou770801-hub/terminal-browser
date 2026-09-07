@@ -1,5 +1,5 @@
-import { Box, Input, Path, Text } from "pixel-react";
-import type { Rgba, Surface } from "pixel-react";
+import { Box, Input, Path, Text } from "terminal-electron";
+import type { Rgba, Surface } from "terminal-electron";
 import {
   CROP_SCOPES,
   MARKUP_COLORS,

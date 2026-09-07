@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Box, Input, Text } from "pixel-react";
-import type { BrowserState } from "../page/types";
+import { Box, Input, Text } from "terminal-electron";
+import type { WebViewState } from "terminal-electron";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { mix, type Theme } from "./theme";
@@ -12,7 +12,7 @@ export function FindBar({
   layout,
   theme,
 }: {
-  state: BrowserState;
+  state: WebViewState;
   actions: ChromeActions;
   layout: ChromeLayout;
   theme: Theme;

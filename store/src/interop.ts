@@ -17,20 +17,9 @@ export const INTEROP_APPS_DIR = path.join(interopRoot("share"), "apps");
 
 export const INTEROP_PROTOCOL_VERSIONS = [1];
 
-export const openSpecSchema = z
-  .object({
-    url: z.string().optional(),
-    app: z
-      .object({
-        id: z.string().min(1),
-        name: z.string().optional(),
-        partition: z.string().optional(),
-        preload: z.string().optional(),
-        mainScript: z.string().optional(),
-      })
-      .optional(),
-  })
-  .refine((spec) => !spec.app || spec.url !== undefined);
+export const openSpecSchema = z.object({
+  url: z.string().optional(),
+});
 export type OpenSpec = z.infer<typeof openSpecSchema>;
 
 export interface OpenResult {
@@ -39,7 +28,6 @@ export interface OpenResult {
 
 export const interopInstanceSchema = z.object({
   protocolVersions: z.array(z.number()),
-  mode: z.enum(["browser", "app"]).catch("browser"),
   pid: z.number(),
   socket: z.string(),
   startedAt: z.number().catch(0),

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { AGENT_SOCKETS_DIR } from "pixel-store";
-import type { Terminal } from "pixel-terminals";
+import type { Terminal } from "terminal-electron/terminal";
 
 import { control } from "./control";
 import { browsers, describe, recordKey, targets } from "./instances";

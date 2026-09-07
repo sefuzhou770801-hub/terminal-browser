@@ -1,4 +1,4 @@
-import type { EngineKeyEvent, KeyMods } from "pixel-react";
+import type { EngineKeyEvent, KeyMods } from "terminal-electron";
 
 export type KeyBinding = KeyMods & { key: string };
 

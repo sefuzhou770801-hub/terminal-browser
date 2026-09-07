@@ -2,7 +2,7 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 
-import { callerTty } from "pixel-terminals";
+import { callerTty } from "terminal-electron/terminal";
 import {
   INTEROP_PROTOCOL_VERSIONS,
   advertiseInstance,
@@ -11,9 +11,9 @@ import {
   upsertInstance,
   withdrawInstance,
 } from "pixel-store";
-import type { InstanceRow, OpenResult, OpenSpec } from "pixel-store";
+import type { InstanceRow } from "pixel-store";
 
-import type { BrowserState } from "./page/types";
+import type { WebViewState } from "terminal-electron";
 import { INSTANCES_DIR } from "pixel-store";
 
 export interface Where {
@@ -22,19 +22,13 @@ export interface Where {
   pane: string | null;
 }
 
-export interface InteropInfo {
-  mode: "browser" | "app";
-}
-
 export interface ControlHost {
   key: string;
   tty: string | null;
   where(): Promise<Where>;
   splitDir: InstanceRow["splitDir"];
   parentTty: string | null;
-  state(): BrowserState;
-  interop(): InteropInfo;
-  openAppTab(spec: OpenSpec, app: NonNullable<OpenSpec["app"]>): OpenResult;
+  state(): WebViewState;
   openTab(url?: string, cwd?: string): number;
   activateTab(id: number): boolean;
   closeTab(id: number): boolean;
@@ -87,6 +81,7 @@ export class Registry {
   record(): InstanceRow {
     return {
       ...this.host.state(),
+      favicon: null,
       tabs: this.host.tabs(),
       viewport: this.host.viewport(),
       pid: process.pid,
@@ -118,7 +113,6 @@ export class Registry {
   private advertise() {
     advertiseInstance(this.host.key, {
       protocolVersions: INTEROP_PROTOCOL_VERSIONS,
-      mode: this.host.interop().mode,
       pid: process.pid,
       socket: this.socketPath,
       startedAt: this.startedAt,
@@ -150,10 +144,7 @@ export class Registry {
       if (request.cmd === "interop/1/open") {
         const parsed = openSpecSchema.safeParse(request);
         if (!parsed.success) throw new Error("malformed open request");
-        const spec = parsed.data;
-        const tab = spec.app
-          ? this.host.openAppTab(spec, spec.app).tab
-          : this.host.openTab(spec.url);
+        const tab = this.host.openTab(parsed.data.url);
         connection.end(`${JSON.stringify({ id, ok: true, data: { tab } })}\n`);
         return;
       }

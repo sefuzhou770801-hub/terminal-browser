@@ -2,38 +2,28 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-import { app, ipcMain, screen } from "electron";
-import { createRequire } from "node:module";
-import type { IpcMainEvent, Session as ElectronSession } from "electron";
-import { createRoot } from "pixel-react";
-import type { DragEvent, EngineKeyEvent, PixelRoot, Surface } from "pixel-react";
-import { detect } from "pixel-terminals";
-import type { Pane, Terminal } from "pixel-terminals";
+import { app, session as electronSession } from "electron";
+import { createRoot } from "terminal-electron";
+import type {
+  DevtoolsDock,
+  DownloadProgress,
+  EngineKeyEvent,
+  Root,
+  WebViewHandle,
+  WebViewState,
+} from "terminal-electron";
+import { detect } from "terminal-electron/terminal";
+import type { Pane, Terminal } from "terminal-electron/terminal";
 
-import {
-  browserSession,
-  configureBrowserSession,
-  routeThroughSocksProxy,
-} from "../page/browser-session";
 import { bundledAsset } from "../assets";
 import { Grab, reactGrabPreloadPath } from "../grab/grab";
 import { AgentPaneFinder } from "../grab/target";
-import type { DownloadProgress } from "../page/browser-session";
-import { BrowserController } from "../page/controller";
-import { initOffscreenMode } from "../page/offscreen";
-import { initialBrowserState } from "../page/types";
-import type { BrowserState, BrowserSurfaceLayout } from "../page/types";
-import { zoomDirection } from "../page/zoom";
-import type { ZoomDirection } from "../page/zoom";
-import { appId, lastUrl, listApps, setLastUrl, settings, store } from "pixel-store";
-import type {
-  DevtoolsDock,
-  InstanceRow,
-  OpenResult,
-  OpenSpec,
-  RegisteredApp,
-} from "pixel-store";
+import { zoomDirection } from "../zoom";
+import type { ZoomDirection } from "../zoom";
+import { lastUrl, listApps, setLastUrl, settings, store } from "pixel-store";
+import type { InstanceRow, RegisteredApp } from "pixel-store";
 
+import type { RecordTarget } from "../record/recorder";
 import { RecordSession } from "../record/session";
 import type { RecordActions } from "../record/types";
 import { Registry } from "../registry";
@@ -42,21 +32,33 @@ import { ICONS } from "../ui/icons";
 import type {
   ChromeActions,
   ChromeLayout,
+  DevtoolsView,
   DownloadView,
+  NewTabSuggestion,
   PageMenuItem,
   PageMenuView,
-  PopupView,
+  TabActions,
+  TabView,
 } from "../ui/types";
-import { normalizeUrl, searchOrUrl } from "../url";
+import { displayUrl, normalizeUrl, searchOrUrl } from "../url";
 import { fuzzyScore } from "./fuzzy";
-import { bindingLabel, defaultKeys, grabKeyLabel, isGrabKey, isRecordKey, listStep, matchesBinding, parseKeyBindings, recordKeyLabel } from "./keybindings";
+import {
+  bindingLabel,
+  defaultKeys,
+  grabKeyLabel,
+  isGrabKey,
+  isRecordKey,
+  listStep,
+  matchesBinding,
+  parseKeyBindings,
+  recordKeyLabel,
+} from "./keybindings";
 import type { KeyBinding } from "./keybindings";
 import { clampDevtoolsFraction, computeLayout, dividerFraction, recordBarHeight } from "./layout";
-import type { DevtoolsPlacement } from "./layout";
+import type { DevtoolsPlacement, SurfaceLayout } from "./layout";
 import { fetchSuggestions } from "./suggest";
 import { TabManager } from "./tabs";
-import type { TabApp } from "./tabs";
-import type { NewTabSuggestion } from "../ui/types";
+import type { Tab } from "./tabs";
 
 export interface SessionContext {
   tty?: string;
@@ -89,57 +91,7 @@ export function createSession(ctx: SessionContext): SessionHandle {
 
 const DEFAULT_URL = "https://github.com/zenbu-labs";
 
-const partitionPreloads = new Map<string, string | null>();
-function claimPartitionPreload(partition: string, preload: string | null) {
-  const existing = partitionPreloads.get(partition);
-  if (existing !== undefined && existing !== preload) {
-    throw new Error(`partition ${partition} already runs a different preload`);
-  }
-  partitionPreloads.set(partition, preload);
-}
-
 const FONT_FILE = path.join("fonts", "JetBrainsMono-Regular.ttf");
-
-const API_PRELOAD_SOURCE = `if (process.isMainFrame) {
-  const { ipcRenderer } = require("electron");
-  let current = null;
-  const subscribers = new Set();
-  ipcRenderer.on("terminal-browser:theme", (_event, theme) => {
-    current = theme;
-    for (const subscriber of subscribers) {
-      try { subscriber(theme); } catch {}
-    }
-  });
-  ipcRenderer.send("terminal-browser:theme-request");
-  globalThis.terminalBrowser = {
-    theme: () => current,
-    onTheme(subscriber) {
-      subscribers.add(subscriber);
-      if (current) { try { subscriber(current); } catch {} }
-      return () => subscribers.delete(subscriber);
-    },
-    quit: () => ipcRenderer.send("terminal-browser:quit"),
-  };
-}
-`;
-
-let apiPreloadFile: string | null = null;
-function apiPreloadPath(): string {
-  if (!apiPreloadFile) {
-    apiPreloadFile = path.join(app.getPath("userData"), "terminal-browser-api-preload.js");
-    fs.writeFileSync(apiPreloadFile, API_PRELOAD_SOURCE);
-  }
-  return apiPreloadFile;
-}
-
-const registeredPreloads = new WeakMap<ElectronSession, Set<string>>();
-function registerPreloadOnce(ses: ElectronSession, filePath: string) {
-  let seen = registeredPreloads.get(ses);
-  if (!seen) registeredPreloads.set(ses, (seen = new Set()));
-  if (seen.has(filePath)) return;
-  seen.add(filePath);
-  ses.registerPreloadScript({ type: "frame", filePath });
-}
 
 function bundledFontPath(): string {
   const found = bundledAsset(FONT_FILE);
@@ -147,6 +99,9 @@ function bundledFontPath(): string {
   return found;
 }
 
+function persistentPartition(partition: string): string {
+  return partition.startsWith("persist:") ? partition : `persist:${partition}`;
+}
 
 interface NewTabState {
   query: string;
@@ -176,6 +131,19 @@ function matchApps(apps: RegisteredApp[], query: string): RegisteredApp[] {
     .map((entry) => entry.app);
 }
 
+function initialState(url: string): WebViewState {
+  return {
+    url,
+    // why...
+    title: "",
+    loading: true,
+    canGoBack: false,
+    canGoForward: false,
+    findMatches: null,
+    zoom: 1,
+  };
+}
+
 class Session {
   private readonly ctx: SessionContext;
   private readonly terminal: Terminal | null;
@@ -190,59 +158,33 @@ class Session {
     noContextMenu: boolean;
     noOverlays: boolean;
     clipboardRead: boolean;
-    tabsAsPopups: boolean;
   };
-  private readonly appIdentity: TabApp | null;
-  private readonly appPartitions: string[] = [];
-  private embedderIpc = false;
-  private wasBare = false;
   private paletteApps: RegisteredApp[] = [];
   private readonly partition: string | null;
   private readonly socksPort: number | null;
-  private readonly preload: string | null;
-  private readonly mainScript: string | null;
-  private readonly onThemeRequest = (event: IpcMainEvent) => {
-    if (!this.ownsSender(event)) return;
-    const payload = this.themePayload();
-    if (payload) event.sender.send("terminal-browser:theme", payload);
-  };
-  private readonly onQuitRequest = (event: IpcMainEvent) => {
-    if (!this.ownsSender(event)) return;
-    const tab = this.tabs.findByContents(event.sender.id);
-    if (tab?.app && this.tabs.count > 1) this.tabs.close(tab.id);
-    else this.shutdown();
-  };
+  private readonly browserPreload: string;
   private paletteBinding: KeyBinding[] = [];
   private findBinding: KeyBinding[] = [];
   private devtoolsBinding: KeyBinding[] = [];
   private consoleBinding: KeyBinding[] = [];
   private noSuper = false;
   private readonly tabs: TabManager;
-  private readonly fallbackState: BrowserState;
+  private readonly fallbackState: WebViewState;
 
-  private root: PixelRoot | null = null;
-  private popupSurface: Surface | null = null;
-  private devtoolsSurface: Surface | null = null;
+  private root: Root | null = null;
   private registry: Registry | null = null;
 
   private layout: ChromeLayout | null = null;
-  private surfaceLayout: BrowserSurfaceLayout | null = null;
-  private devtoolsLayout: BrowserSurfaceLayout | null = null;
-  private displayScale = 1;
+  private surfaceLayout: SurfaceLayout | null = null;
   private fontId = 0;
-  private windowBg = "#1e2026";
 
-  private browserFocused = false;
   private shuttingDown = false;
-  private pageHover = false;
-  private popupHover = false;
-  private devtoolsHover = false;
-  private devtoolsWasFocused = false;
   private devtoolsDockSide: DevtoolsDock = "bottom";
   private devtoolsFraction = 0.4;
+  private devtoolsPanel: string | null = null;
   private dividerHover = false;
   private dividerDragging = false;
-  private dividerResizeAt = 0;
+  private dividerRenderAt = 0;
   private pageMenu:
     | {
         kind: "page";
@@ -255,7 +197,6 @@ class Session {
       }
     | { kind: "toolbar" }
     | null = null;
-  private sentCursor: string | null = null;
 
   private findOpen = false;
   private urlEditOpen = false;
@@ -263,14 +204,13 @@ class Session {
   private newTab: NewTabState | null = null;
   private zoomHud: number | null = null;
   private zoomHudTimer: ReturnType<typeof setTimeout> | null = null;
-  private cellFollow: { height: number; basePx: number } | null = null;
   private download: DownloadView | null = null;
   private downloadTimer: ReturnType<typeof setTimeout> | null = null;
   private toast: { text: string; detail?: string; failed: boolean; alert: boolean } | null =
     null;
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
-  private records = new Map<BrowserController, RecordSession>();
-  private grabs = new Map<BrowserController, Grab>();
+  private records = new Map<number, RecordSession>();
+  private grabs = new Map<number, Grab>();
   private readonly grabIcon = bundledAsset(path.join("react-grab", "logo.png"));
   private readonly agentPanes: AgentPaneFinder;
   private shownRecord: RecordSession | null = null;
@@ -294,147 +234,76 @@ class Session {
       noContextMenu: this.argv.includes("--no-context-menu"),
       noOverlays: this.argv.includes("--no-overlays"),
       clipboardRead: this.argv.includes("--allow-clipboard-read"),
-      tabsAsPopups: this.argv.includes("--open-tabs-in-popup-stack"),
     };
-    const appName = flagValue(this.argv, "--app-name");
-    this.appIdentity = this.argv.includes("--app-mode")
-      ? { name: appName, id: appId(flagValue(this.argv, "--app-id") ?? appName ?? "app") }
-      : null;
-    this.wasBare = this.appIdentity != null;
     const sshTarget = flagValue(this.argv, "--ssh");
     const socksPort = Number(flagValue(this.argv, "--socks-port"));
     this.socksPort = Number.isInteger(socksPort) && socksPort > 0 ? socksPort : null;
-    this.partition =
-      flagValue(this.argv, "--partition") ??
-      (sshTarget ? `ssh-${sshTarget.replace(/[^A-Za-z0-9@._-]/g, "-")}` : null);
-    this.preload = flagValue(this.argv, "--preload");
-    this.mainScript = flagValue(this.argv, "--main-script");
-    this.fallbackState = initialBrowserState(this.initialUrl());
-    registerPreloadOnce(
-      configureBrowserSession(this.partition, (progress) => this.showDownload(progress)),
-      reactGrabPreloadPath(),
-    );
+    this.partition = sshTarget ? `ssh-${sshTarget.replace(/[^A-Za-z0-9@._-]/g, "-")}` : null;
+    this.fallbackState = initialState(this.initialUrl());
+    this.browserPreload = reactGrabPreloadPath();
     this.tabs = new TabManager(
       {
-        createController: (url, visible, onState, options) =>
-          new BrowserController(
-            this.root!.createSurface(),
-            this.popupSurface!,
-            this.devtoolsSurface!,
-            this.surfaceLayout!,
-            url,
-            {
-              cwd: this.ctx.cwd,
-              background: this.windowBg,
-              visible,
-              partition: options.partition !== undefined ? options.partition : this.partition,
-              tabsAsPopups: this.sessionFlags.tabsAsPopups || options.app != null,
-              clipboardRead: this.sessionFlags.clipboardRead || options.app != null,
-              sessionKey: this.ctx.key,
-              appTabId: options.app ? options.tabId : null,
-            },
-            onState,
-          ),
         onActivated: () => {
-          this.browserFocused = true;
           this.pageMenu = null;
           this.reconcileRecord();
-          this.syncDevtoolsLayout();
-          this.syncCursor();
+          this.recalculateLayout();
+          this.render();
           this.registry?.update();
-        },
-        onDevtoolsChanged: () => this.syncDevtoolsLayout(),
-        onDevtoolsAction: (action) => {
-          if (action === "close") this.tabs.activeController?.closeDevtools();
-          else this.setDevtoolsDockSide(action === "dock-bottom" ? "bottom" : "right");
+          this.syncTitle();
         },
         onPageMenu: (params) => this.openPageMenu(params),
-        onTabOpened: (opener, url) => this.records.get(opener)?.linkOpened(url),
-        onTabClosed: (id) => this.closeOrShutdown(id),
+        onTabOpened: (opener, url) => this.records.get(opener.id)?.linkOpened(url),
         tabSwitchAllowed: () => !this.activeRecord()?.reviewing,
         onTabsChanged: () => {
-          this.syncChromeComposition();
           this.registry?.update();
           for (const record of [...this.records.values()]) {
-            if (record.active && this.tabs.stateFor(record.controller) == null) record.tabClosed();
+            if (record.active && !this.tabs.has(record.target.tabId)) record.tabClosed();
           }
-          for (const [controller, grab] of [...this.grabs]) {
-            if (this.tabs.stateFor(controller) != null) continue;
+          for (const [id, grab] of [...this.grabs]) {
+            if (this.tabs.has(id)) continue;
             grab.dispose();
-            this.grabs.delete(controller);
+            this.grabs.delete(id);
           }
         },
         onActiveState: (state, urlChanged) => {
           if (urlChanged) rememberUrl(state.url);
+          if (Math.abs(state.zoom - this.lastZoom) > 0.001) this.showZoomHud(state.zoom);
+          this.lastZoom = state.zoom;
           this.registry?.update();
+          this.syncTitle();
         },
-        onCursorChanged: () => this.syncCursor(),
         requestRender: () => this.render(),
       },
       DEFAULT_URL,
     );
   }
 
+  private lastZoom = 1;
+
   async start(): Promise<void> {
-    if (this.socksPort) await routeThroughSocksProxy(this.partition, this.socksPort);
+    if (this.socksPort) await this.routeThroughSocksProxy(this.socksPort);
     if (process.platform === "darwin") app.dock?.hide();
     await this.loadDevtoolsSettings();
     if (!this.ctx.tty) process.stdout.write(`\x1b]2;${this.marker}\x07`);
-    this.displayScale = this.hostDisplayScale();
     this.root = createRoot({
+      name: "terminal-browser",
       tty: this.ctx.tty,
-      wrapper: this.terminal?.wrapper,
       sessionEnv: this.ctx.env,
-      keyEventTypes: true,
       onKey: (event) => this.handleKey(event),
-      onPaste: (text) => {
-        const browser = this.tabs.activeController;
-        if (browser?.popup) browser.popup.input.paste(text);
-        else if (this.browserFocused && browser?.devtoolsFocused) {
-          browser.devtools?.input.paste(text);
-        } else if (this.browserFocused) browser?.paste(text);
-      },
-      onPasteImage: (image) => {
-        const browser = this.tabs.activeController;
-        if (browser?.popup) browser.popup.input.pasteImage(image);
-        else if (this.browserFocused && browser?.devtoolsFocused) {
-          browser.devtools?.input.pasteImage(image);
-        } else if (this.browserFocused) browser?.pasteImage(image);
-      },
-      onFocus: (focused) => this.tabs.activeController?.setActive(focused),
       onResize: () => {
-        this.followCellZoom();
+        // really?
         this.recalculateLayout();
-        if (this.surfaceLayout) this.tabs.activeController?.resize(this.surfaceLayout);
-        if (this.devtoolsLayout) this.tabs.activeController?.devtools?.resize(this.devtoolsLayout);
         this.render();
       },
-      onColors: () => {
-        this.windowBg = this.themeBackground();
-        this.tabs.eachController((c) => void c.setBackground(this.windowBg));
-        this.render();
-        this.broadcastTheme();
-      },
-      onEngineExit: (error) => {
-        if (error) process.stderr.write(`terminal-browser engine: ${error}\n`);
-        this.shutdown(error ? 1 : 0);
-      },
+      onColors: () => this.render(),
+      onQuit: () => this.shutdown(),
+      onExit: (code) => this.ctx.onClose(code),
     });
-    initOffscreenMode(this.root.sharedTextures);
     this.fontId = await this.root.registerFont(bundledFontPath());
     this.applyKeyBindings(this.root.info.kittyKeyboard);
-    this.popupSurface = this.root.createSurface();
-    this.devtoolsSurface = this.root.createSurface();
-    this.followCellZoom();
     this.recalculateLayout();
     this.root.setPointerShape("default");
-    this.windowBg = this.themeBackground();
-    this.installEmbedderApi();
-    if (this.appIdentity) {
-      this.tabs.create(this.fallbackState.url, true, { app: this.appIdentity });
-    } else {
-      this.tabs.create(this.fallbackState.url);
-    }
+    this.tabs.create(this.fallbackState.url);
     this.registry = new Registry({
       key: this.ctx.key,
       tty: this.ctx.tty ?? null,
@@ -449,10 +318,6 @@ class Session {
       splitDir: splitDirection(flagValue(this.argv, "--split-dir")),
       parentTty: flagValue(this.argv, "--parent-tty"),
       state: () => this.tabs.activeState ?? this.fallbackState,
-      interop: () => ({
-        mode: this.appIdentity ? ("app" as const) : ("browser" as const),
-      }),
-      openAppTab: (spec, app) => this.openAppTab(spec, app),
       openTab: (url, cwd) => this.tabs.create(url ? normalizeUrl(url, cwd) : DEFAULT_URL).id,
       activateTab: (id) => {
         if (!this.tabs.has(id) || this.activeRecord()?.reviewing) return false;
@@ -476,6 +341,20 @@ class Session {
     this.render();
   }
 
+  private async routeThroughSocksProxy(port: number): Promise<void> {
+    const target = this.partition
+      ? electronSession.fromPartition(persistentPartition(this.partition))
+      : electronSession.defaultSession;
+    app.on("web-contents-created", (_event, contents) => {
+      if (contents.session === target) contents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
+    });
+    await target.setProxy({
+      proxyRules: `socks5://127.0.0.1:${port}`,
+      proxyBypassRules: "<-loopback>",
+    });
+  }
+
+
   private findOwnPane(): Promise<Pane | null> {
     if (this.ownPane) return Promise.resolve(this.ownPane);
     this.finding ??= (
@@ -496,7 +375,6 @@ class Session {
       parseKeyBindings(flagValue(this.argv, flag) ?? defaultBinding(fallback, this.noSuper));
     this.paletteBinding = binding("--palette-key", defaultKeys.palette);
     this.findBinding = binding("--find-key", defaultKeys.find);
-    // we should use 2 shortcuts for console, also not sure if console actually works as expected
     this.devtoolsBinding = binding("--devtools-key", defaultKeys.devtools);
     this.consoleBinding = binding("--console-key", defaultKeys.console);
   }
@@ -509,194 +387,47 @@ class Session {
     return this.cmdHeld(event) || (process.platform === "linux" && event.mods.ctrl);
   }
 
-  private clipboardHeld(event: EngineKeyEvent): boolean {
-    if (this.cmdHeld(event)) return true;
-    return (
-      process.platform === "linux" && event.mods.ctrl && !event.mods.shift && !event.mods.alt
-    );
-  }
-
-  private isPasteKey(event: EngineKeyEvent): boolean {
-    return event.kind === "press" && this.clipboardHeld(event) && event.key === "v";
-  }
-
-  private isCopyKey(event: EngineKeyEvent): boolean {
-    return event.kind === "press" && this.clipboardHeld(event) && event.key === "c";
-  }
-
-  private isCutKey(event: EngineKeyEvent): boolean {
-    return event.kind === "press" && this.clipboardHeld(event) && event.key === "x";
-  }
-
-  private focusedInput(): { selectionText(): Promise<string> } | null {
-    const browser = this.tabs.activeController;
-    if (!browser) return null;
-    if (browser.popup) return browser.popup.input;
-    if (browser.devtoolsFocused && browser.devtools) return browser.devtools.input;
-    return browser;
-  }
-
-  private async mirrorSelection(): Promise<boolean> {
-    const text = await this.focusedInput()?.selectionText();
-    if (!text) return false;
-    this.root?.setClipboard(text);
-    return true;
-  }
-
-  private async copySelection() {
-    if (await this.mirrorSelection()) this.showToast("copied to clipboard", "done");
-    else if (process.platform === "linux") this.showToast("ctrl+q to quit", "alert");
-  }
-
   private closeOrShutdown(id: number) {
     if (this.tabs.count <= 1) this.shutdown();
     else this.tabs.close(id);
   }
 
-  private appTabActive(): boolean {
-    return this.tabs.active?.app != null;
-  }
-
-  private bareChrome(): boolean {
-    if (this.tabs.count === 0) return this.appIdentity != null;
-    return this.tabs.soleAppTab();
-  }
-
-  private syncChromeComposition() {
-    const bare = this.bareChrome();
-    if (bare === this.wasBare) return;
-    this.wasBare = bare;
-    this.recalculateLayout();
-    this.resizeSplitWindows();
-    this.render();
+  // What another terminal-electron app shows on this browser's tab when the
+  // browser is a guest in its pane.
+  private syncTitle() {
+    const state = this.tabs.activeState;
+    this.root?.setTitle(state ? state.title || displayUrl(state.url) : "");
   }
 
   shutdown(code = 0) {
     if (this.shuttingDown) return;
     this.shuttingDown = true;
-    ipcMain.removeListener("terminal-browser:theme-request", this.onThemeRequest);
-    ipcMain.removeListener("terminal-browser:quit", this.onQuitRequest);
     for (const record of this.records.values()) record.dispose();
     this.records.clear();
     this.shownRecord = null;
-    try {
-      this.root?.setPointerShape("text");
-    } catch { }
-    try {
-      browserSession(this.partition).flushStorageData();
-    } catch { }
-    for (const partition of this.appPartitions) {
-      try {
-        browserSession(partition).flushStorageData();
-      } catch { }
-    }
     this.registry?.dispose();
     this.registry = null;
     this.tabs.stopAll();
-    try {
-      this.popupSurface?.close();
-      this.devtoolsSurface?.close();
-    } catch { }
-    this.root?.stop();
-    this.ctx.onClose(code);
+    if (this.root) this.root.stop(code);
+    else this.ctx.onClose(code);
   }
 
   nudgeResize() {
     this.root?.nudgeResize();
   }
 
-  private themePayload(): {
-    background: number[];
-    foreground: number[];
-    ansi: (number[] | null)[];
-  } | null {
-    if (!this.root) return null;
-    const colors = this.root.info.colors;
-    if (!colors.background || !colors.foreground) return null;
-    const rgb = (channelled: number[] | null) =>
-      channelled ? [channelled[0], channelled[1], channelled[2]] : null;
-    return {
-      background: rgb(colors.background) as number[],
-      foreground: rgb(colors.foreground) as number[],
-      ansi: Array.from({ length: 16 }, (_, at) => rgb(colors.palette[at] ?? null)),
-    };
-  }
-
-  private ownsSender(event: IpcMainEvent): boolean {
-    if (event.senderFrame !== event.sender.mainFrame) return false;
-    let mine = false;
-    this.tabs.eachController((controller) => {
-      if (controller.hasContents(event.sender.id)) mine = true;
-    });
-    return mine;
-  }
-
-  private broadcastTheme(): void {
-    if (!this.embedderIpc) return;
-    const payload = this.themePayload();
-    if (!payload) return;
-    this.tabs.eachController((controller) =>
-      controller.sendToPage("terminal-browser:theme", payload),
-    );
-  }
-
-  private ensureEmbedderIpc(): void {
-    if (this.embedderIpc) return;
-    this.embedderIpc = true;
-    ipcMain.on("terminal-browser:theme-request", this.onThemeRequest);
-    ipcMain.on("terminal-browser:quit", this.onQuitRequest);
-  }
-
-  private installEmbedderApi(): void {
-    if (!this.preload && !this.mainScript) return;
-    this.ensureEmbedderIpc();
-    if (this.preload) {
-      const ses = browserSession(this.partition);
-      registerPreloadOnce(ses, apiPreloadPath());
-      registerPreloadOnce(ses, path.resolve(this.ctx.cwd, this.preload));
-    }
-    if (this.mainScript) {
-      const file = path.resolve(this.ctx.cwd, this.mainScript);
-      try {
-        createRequire(file)(file);
-      } catch (error) {
-        process.stderr.write(
-          `main script failed: ${error instanceof Error ? error.message : String(error)}\n`,
-        );
-      }
-    }
-  }
-
-  private openAppTab(spec: OpenSpec, app: NonNullable<OpenSpec["app"]>): OpenResult {
-    const id = appId(app.id);
-    const partition = app.partition ?? `app-${id}`;
-    for (const file of [app.preload, app.mainScript]) {
-      if (file && !path.isAbsolute(file)) throw new Error(`${file} is not an absolute path`);
-    }
-    claimPartitionPreload(partition, app.preload ?? null);
-    const ses = configureBrowserSession(partition, (progress) => this.showDownload(progress));
-    if (app.preload) {
-      registerPreloadOnce(ses, apiPreloadPath());
-      registerPreloadOnce(ses, app.preload);
-    }
-    if (app.mainScript) createRequire(app.mainScript)(app.mainScript);
-    this.ensureEmbedderIpc();
-    if (!this.appPartitions.includes(partition)) this.appPartitions.push(partition);
-    const tab = this.tabs.create(spec.url ? normalizeUrl(spec.url) : DEFAULT_URL, true, {
-      app: { name: app.name ?? null, id },
-      partition,
-    });
-    return { tab: tab.id };
-  }
-
+  // The app is started on this browser's tty, so if it is a terminal-electron
+  // app it joins this pane as a tab rather than opening one of its own.
   private launchApp(app: RegisteredApp) {
     const env = { ...this.ctx.env };
     if (this.registry) env.TERMINAL_BROWSER_INTEROP_TARGET = this.registry.socketPath;
+    const tty = this.ctx.tty ?? process.env.TERMINAL_ELECTRON_TTY;
+    if (tty) env.TERMINAL_ELECTRON_TTY = tty;
     try {
       const child = spawn(app.bin, app.args, {
         cwd: this.ctx.cwd,
         detached: true,
-        stdio: "ignore",
+        stdio: tty ? "ignore" : "inherit",
         env,
       });
       child.on("error", () => this.showToast(`could not launch ${app.name}`, "failed"));
@@ -706,16 +437,36 @@ class Session {
     }
   }
 
-  private themeBackground(): string {
-    const bg = this.root?.info.colors.background ?? [30, 32, 38, 255];
-    return `#${bg.slice(0, 3).map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+  private tabViews(): TabView[] {
+    const active = this.tabs.active;
+    return this.tabs.all().map((tab) => ({
+      id: tab.id,
+      url: tab.url,
+      ref: tab.ref,
+      active: tab.id === active?.id,
+      partition: this.partition,
+      preload: this.browserPreload,
+      clipboardRead: this.sessionFlags.clipboardRead,
+    }));
   }
 
+  private devtoolsView(): DevtoolsView | null {
+    if (!this.tabs.active?.devtools) return null;
+    return { dock: this.devtoolsDockSide, panel: this.devtoolsPanel };
+  }
+
+  private readonly tabActions: TabActions = {
+    state: (id, state) => this.tabs.stateChanged(id, state),
+    openWindow: (id, details) => this.tabs.openWindow(id, details),
+    contextMenu: (id, params) => this.tabs.contextMenu(id, params),
+    download: (progress) => this.showDownload(progress),
+    pointer: (id, event) => {
+      if (id === this.tabs.active?.id) this.activeRecord()?.pointerSample(event);
+    },
+  };
+
   private render() {
-    if (!this.root || !this.layout || !this.popupSurface) return;
-    if (!this.devtoolsSurface) return;
-    const pageSurface = this.tabs.activeController?.surface;
-    if (!pageSurface) return;
+    if (!this.root || !this.layout) return;
     this.root.render(
       <Chrome
         state={this.tabs.activeState ?? this.fallbackState}
@@ -731,8 +482,7 @@ class Session {
             : null
         }
         urlEdit={this.urlEditOpen}
-        noOverlays={this.sessionFlags.noOverlays || this.appTabActive()}
-        popup={this.popupView()}
+        noOverlays={this.sessionFlags.noOverlays}
         zoomHud={this.zoomHud}
         download={this.download}
         toast={this.toast}
@@ -752,41 +502,28 @@ class Session {
         dividerEngaged={this.dividerHover || this.dividerDragging}
         record={this.activeRecord()?.view() ?? null}
         recordSurface={this.activeRecord()?.surface ?? null}
-        pageSurface={pageSurface}
-        popupSurface={this.popupSurface}
-        devtoolsSurface={this.devtoolsSurface}
+        tabViews={this.tabViews()}
+        tabActions={this.tabActions}
+        devtools={this.devtoolsView()}
       />,
     );
   }
 
   private readonly actions: ChromeActions = {
-    back: () => this.tabs.activeController?.back(),
-    forward: () => this.tabs.activeController?.forward(),
+    back: () => this.tabs.activeHandle?.back(),
+    forward: () => this.tabs.activeHandle?.forward(),
     reload: () => {
       this.activeRecord()?.reloaded();
-      this.tabs.activeController?.reload();
+      this.tabs.activeHandle?.reload();
     },
     urlEdit: () => this.openUrlEdit(),
     urlEditCancel: () => this.closeUrlEdit(),
     urlSubmit: (text) => {
       this.closeUrlEdit();
-      if (text.trim()) this.tabs.activeController?.navigate(searchOrUrl(text, this.ctx.cwd));
+      if (text.trim()) this.tabs.activeHandle?.loadURL(this.resolveInput(text));
     },
-    pointer: (event) => {
-      this.browserFocused = true;
-      this.activeRecord()?.pointerSample(event);
-      this.tabs.activeController?.pointer(event);
-    },
-    wheel: (event) => {
-      this.browserFocused = true;
-      this.tabs.activeController?.wheel(event);
-    },
-    pageHover: (hovering) => {
-      this.pageHover = hovering;
-      this.syncCursor();
-    },
-    findChange: (text) => this.tabs.activeController?.find(text),
-    findNext: (forward) => this.tabs.activeController?.findNext(forward),
+    findChange: (text) => this.tabs.activeHandle?.find(text),
+    findNext: (forward) => this.tabs.activeHandle?.findNext(forward),
     findClose: () => this.closeFind(),
     paletteQuery: (text) => {
       if (!this.palette) return;
@@ -803,38 +540,15 @@ class Session {
     newTabQuery: (text) => this.newTabQuery(text),
     newTabSubmit: (text) => {
       this.closeNewTabModal();
-      if (text.trim()) this.tabs.create(searchOrUrl(text, this.ctx.cwd));
+      if (text.trim()) this.tabs.create(this.resolveInput(text));
     },
     newTabPick: (index) => this.pickNewTab(index),
     newTabCancel: () => this.closeNewTabModal(),
-    popupPointer: (event) => this.tabs.activeController?.popup?.input.pointer(event),
-    popupWheel: (event) => this.tabs.activeController?.popup?.input.wheel(event),
-    popupClose: () => this.tabs.activeController?.popup?.close(),
-    popupHover: (hovering) => {
-      this.popupHover = hovering;
-      this.syncCursor();
-    },
-    devtoolsPointer: (event) => {
-      const browser = this.tabs.activeController;
-      if (!browser?.devtools) return;
-      this.browserFocused = true;
-      browser.focusDevtools();
-      browser.devtools.input.pointer(event);
-    },
-    devtoolsWheel: (event) => {
-      const browser = this.tabs.activeController;
-      if (!browser?.devtools) return;
-      this.browserFocused = true;
-      browser.focusDevtools();
-      browser.devtools.input.wheel(event);
-    },
-    devtoolsHover: (hovering) => {
-      this.devtoolsHover = hovering;
-      this.syncCursor();
-    },
     devtoolsDividerHover: (hovering) => {
       this.dividerHover = hovering;
-      this.syncCursor();
+      this.root?.setPointerShape(
+        hovering ? (this.devtoolsDockSide === "bottom" ? "row-resize" : "col-resize") : "default",
+      );
       this.render();
     },
     devtoolsDividerDrag: (event) => {
@@ -847,19 +561,23 @@ class Session {
       }
       if (event.phase === "move") {
         this.devtoolsFraction = dividerFraction(page, devtools, event.x, event.y);
-        this.recalculateLayout();
         const now = Date.now();
-        if (now - this.dividerResizeAt > 50) {
-          this.dividerResizeAt = now;
-          this.resizeSplitWindows({ keepFrame: true });
+        if (now - this.dividerRenderAt > 50) {
+          this.dividerRenderAt = now;
+          this.recalculateLayout();
+          this.render();
         }
-        this.render();
       }
       if (event.phase === "end") {
         this.dividerDragging = false;
         this.saveDevtoolsSettings();
-        this.syncDevtoolsLayout({ keepFrame: true });
+        this.recalculateLayout();
+        this.render();
       }
+    },
+    devtoolsAction: (action) => {
+      if (action === "close") this.closeDevtools();
+      else this.setDevtoolsDockSide(action === "dock-bottom" ? "bottom" : "right");
     },
     pageMenuAction: (id) => this.runPageMenu(id),
     pageMenuClose: () => this.closePageMenu(),
@@ -868,8 +586,8 @@ class Session {
 
   /** the record session lives with its tab; the active tab's session gets the UI and input */
   private activeRecord(): RecordSession | null {
-    const controller = this.tabs.activeController;
-    return controller ? this.records.get(controller) ?? null : null;
+    const tab = this.tabs.active;
+    return tab ? this.records.get(tab.id) ?? null : null;
   }
 
   private reconcileRecord() {
@@ -908,48 +626,55 @@ class Session {
     };
   }
 
+  private recordTarget(tab: Tab): RecordTarget {
+    return {
+      tabId: tab.id,
+      handle: () => {
+        const handle = tab.ref.current;
+        if (!handle) throw new Error(`tab ${tab.id} is gone`);
+        return handle;
+      },
+    };
+  }
+
   private async startRecording() {
     if (this.recordStarting) return;
-    const controller = this.tabs.activeController;
-    if (!controller || !this.root || this.records.has(controller)) return;
+    const tab = this.tabs.active;
+    if (!tab || !tab.ref.current || !this.root || this.records.has(tab.id)) return;
+    const root = this.root;
     const whenActive = (fn: () => void) => () => {
-      if (this.tabs.activeController === controller) fn();
+      if (this.tabs.active?.id === tab.id) fn();
     };
     this.recordStarting = true;
     try {
       const session = await RecordSession.create(
         {
-          root: this.root,
+          root,
           layout: () => this.layout,
           canvasRect: () => {
             const surface = this.surfaceLayout!;
             return { x: surface.x, y: surface.y, width: surface.width, height: surface.height };
           },
-          page: () => {
-            const state = this.tabs.stateFor(controller) ?? this.fallbackState;
-            return { url: state.url, title: state.title };
-          },
+          page: () => ({ url: tab.state.url, title: tab.state.title }),
           fontFile: () => bundledFontPath(),
           requestRender: () => this.render(),
           blurToOverlay: whenActive(() => this.blurToOverlay()),
           reviewStarted: whenActive(() => this.syncRecordLayout()),
           refocusPage: whenActive(() => this.refocusPage()),
           setKeyCapture: (keys) => {
-            if (keys.length === 0 || this.tabs.activeController === controller) {
-              this.root?.setKeyCapture(keys);
-            }
+            if (keys.length === 0 || this.tabs.active?.id === tab.id) root.setKeyCapture(keys);
           },
-          setClipboard: (text) => this.root?.setClipboard(text),
+          setClipboard: (text) => root.setClipboard(text),
           toast: (name, state, detail) => this.showToast(name, state, detail),
           finished: () => {
-            this.records.delete(controller);
-            if (this.shownRecord?.controller === controller) this.shownRecord = null;
+            this.records.delete(tab.id);
+            if (this.shownRecord?.target.tabId === tab.id) this.shownRecord = null;
             this.syncRecordLayout();
           },
         },
-        controller,
+        this.recordTarget(tab),
       );
-      this.records.set(controller, session);
+      this.records.set(tab.id, session);
     } catch (error) {
       this.showToast(error instanceof Error ? error.message : String(error), "failed");
       return;
@@ -961,200 +686,138 @@ class Session {
 
   private syncRecordLayout() {
     this.recalculateLayout();
-    this.resizeSplitWindows();
     this.render();
   }
 
-  private handleKey(event: EngineKeyEvent) {
-    const noShortcuts = this.sessionFlags.noShortcuts || this.appTabActive();
-    const browser = this.tabs.activeController;
-    if (browser?.popup) {
-      if (event.kind !== "release" && event.key === "escape") {
-        browser.popup.close();
-        return;
+  // Returns true when the browser consumed the key; anything else reaches the
+  // focused page through terminal-electron.
+  private handleKey(event: EngineKeyEvent): boolean {
+    const noShortcuts = this.sessionFlags.noShortcuts;
+    const handle = this.tabs.activeHandle;
+    if (event.kind === "release") return false;
+    const quitKey = event.key === "q" || (process.platform === "darwin" && event.key === "c");
+    if (!noShortcuts && event.mods.ctrl && quitKey) {
+      this.shutdown();
+      return true;
+    }
+    if (this.pageMenu) {
+      this.closePageMenu();
+      if (event.key === "escape") return true;
+    }
+    if (this.palette) {
+      const step = listStep(event);
+      if (event.key === "escape" || matchesBinding(event, this.paletteBinding)) {
+        this.closePalette();
+      } else if (step) {
+        const count = this.filteredPalette().length;
+        if (count > 0) {
+          this.palette.index = (this.palette.index + step + count) % count;
+          this.render();
+        }
+      } else if (event.key === "enter") this.runPalette();
+      return true;
+    }
+    if (this.newTab) {
+      const session = this.newTab;
+      const step = listStep(event);
+      if (event.key === "escape") this.closeNewTabModal();
+      else if (step) {
+        const count = this.newTabRows().length;
+        if (count > 0) {
+          session.index =
+            step > 0
+              ? session.index >= count - 1
+                ? -1
+                : session.index + 1
+              : session.index <= -1
+                ? count - 1
+                : session.index - 1;
+          this.render();
+        }
+      } else if (event.key === "enter") {
+        if (session.index >= 0) this.pickNewTab(session.index);
+        else this.actions.newTabSubmit(session.query);
       }
-      if (!noShortcuts && event.kind !== "release" && event.mods.ctrl && event.key === "q") {
-        this.shutdown();
-        return;
+      return true;
+    }
+    if (this.urlEditOpen) {
+      if (event.key === "escape") this.closeUrlEdit();
+      return true;
+    }
+    if (!this.findOpen && this.activeRecord()?.handleKey(event)) return true;
+    if (!noShortcuts) {
+      if (isRecordKey(event)) {
+        if (!this.activeRecord()) void this.startRecording();
+        return true;
       }
-      if (!noShortcuts && event.kind !== "release" && this.cmdHeld(event)) {
+      if (isGrabKey(event)) {
+        void this.toggleGrab();
+        return true;
+      }
+      if ((this.cmdHeld(event) || event.mods.ctrl) && event.key === "t") {
+        if (!this.activeRecord()?.reviewing) this.openNewTabModal();
+        return true;
+      }
+      if (matchesBinding(event, this.paletteBinding)) {
+        this.openPalette();
+        return true;
+      }
+      if (this.accelHeld(event) && event.key === "l") {
+        this.openUrlEdit();
+        return true;
+      }
+      if (matchesBinding(event, this.findBinding)) {
+        this.openFind();
+        return true;
+      }
+      if (matchesBinding(event, this.devtoolsBinding) || isPlainKey(event, "f12")) {
+        this.toggleDevtools();
+        return true;
+      }
+      if (matchesBinding(event, this.consoleBinding)) {
+        this.toggleDevtoolsConsole();
+        return true;
+      }
+    }
+    if (event.key === "escape" && this.findOpen) {
+      this.closeFind();
+      return true;
+    }
+    if (event.key === "enter" && this.findOpen) {
+      handle?.findNext(!event.mods.shift);
+      return true;
+    }
+    if (!noShortcuts) {
+      if (this.accelHeld(event) && event.key === "r") {
+        this.activeRecord()?.reloaded();
+        handle?.reload();
+        return true;
+      }
+      if ((this.accelHeld(event) || event.mods.ctrl) && event.key === "[") {
+        handle?.back();
+        return true;
+      }
+      if ((this.accelHeld(event) || event.mods.ctrl) && event.key === "]") {
+        handle?.forward();
+        return true;
+      }
+      if (this.cmdHeld(event)) {
         const direction = zoomDirection(event.key);
         if (direction !== null) {
           this.applyZoom(direction);
-          return;
-        }
-      }
-      if (this.isPasteKey(event)) this.root?.requestClipboardImage();
-      if (this.isCopyKey(event)) void this.copySelection();
-      if (this.isCutKey(event)) void this.mirrorSelection();
-      browser.popup.input.key(event);
-      return;
-    }
-    if (event.kind !== "release") {
-      const quitKey =
-        event.key === "q" || (process.platform === "darwin" && event.key === "c");
-      if (!noShortcuts && event.mods.ctrl && quitKey) {
-        this.shutdown();
-        return;
-      }
-      if (this.pageMenu) {
-        this.closePageMenu();
-        if (event.key === "escape") return;
-      }
-
-      if (this.palette) {
-        const step = listStep(event);
-        if (event.key === "escape" || matchesBinding(event, this.paletteBinding)) {
-          this.closePalette();
-        } else if (step) {
-          const count = this.filteredPalette().length;
-          if (count > 0) {
-            this.palette.index = (this.palette.index + step + count) % count;
-            this.render();
-          }
-        } else if (event.key === "enter") this.runPalette();
-        return;
-      }
-      if (this.newTab) {
-        const session = this.newTab;
-        const step = listStep(event);
-        if (event.key === "escape") this.closeNewTabModal();
-        else if (step) {
-          const count = this.newTabRows().length;
-          if (count > 0) {
-            session.index =
-              step > 0
-                ? session.index >= count - 1
-                  ? -1
-                  : session.index + 1
-                : session.index <= -1
-                  ? count - 1
-                  : session.index - 1;
-            this.render();
-          }
-        } else if (event.key === "enter") {
-          if (session.index >= 0) this.pickNewTab(session.index);
-          else this.actions.newTabSubmit(session.query);
-        }
-        return;
-      }
-      if (this.urlEditOpen) {
-        if (event.key === "escape") this.closeUrlEdit();
-        return;
-      }
-      if (!this.findOpen && this.activeRecord()?.handleKey(event)) return;
-      if (!noShortcuts) {
-        if (isRecordKey(event)) {
-          if (!this.activeRecord()) void this.startRecording();
-          return;
-        }
-        if (isGrabKey(event)) {
-          void this.toggleGrab();
-          return;
-        }
-        if ((this.cmdHeld(event) || event.mods.ctrl) && event.key === "t") {
-          if (!this.activeRecord()?.reviewing) this.openNewTabModal();
-          return;
-        }
-        if (matchesBinding(event, this.paletteBinding)) {
-          this.openPalette();
-          return;
-        }
-        if (this.accelHeld(event) && event.key === "l") {
-          this.openUrlEdit();
-          return;
-        }
-        if (matchesBinding(event, this.findBinding)) {
-          this.openFind();
-          return;
-        }
-        if (matchesBinding(event, this.devtoolsBinding) || isPlainKey(event, "f12")) {
-          this.toggleDevtools();
-          return;
-        }
-        if (matchesBinding(event, this.consoleBinding)) {
-          this.toggleDevtoolsConsole();
-          return;
-        }
-      }
-      if (event.key === "escape" && this.findOpen) {
-        this.closeFind();
-        return;
-      }
-      if (event.key === "enter" && this.findOpen) {
-        browser?.findNext(!event.mods.shift);
-        return;
-      }
-      if (!noShortcuts) {
-        if (this.accelHeld(event) && event.key === "r") {
-          this.activeRecord()?.reloaded();
-          browser?.reload();
-          return;
-        }
-        if ((this.accelHeld(event) || event.mods.ctrl) && event.key === "[") {
-          browser?.back();
-          return;
-        }
-        if ((this.accelHeld(event) || event.mods.ctrl) && event.key === "]") {
-          browser?.forward();
-          return;
-        }
-        if (this.cmdHeld(event)) {
-          const direction = zoomDirection(event.key);
-          if (direction !== null) {
-            this.applyZoom(direction);
-            return;
-          }
+          return true;
         }
       }
     }
-    if (event.kind === "release") {
-      this.routeKey(event);
-      return;
-    }
-    if (this.browserFocused) {
-      if (this.isPasteKey(event)) this.root?.requestClipboardImage();
-      if (this.isCopyKey(event)) void this.copySelection();
-      if (this.isCutKey(event)) void this.mirrorSelection();
-      this.routeKey(event);
-    }
-  }
-
-  private routeKey(event: EngineKeyEvent) {
-    const browser = this.tabs.activeController;
-    if (browser?.devtoolsFocused && browser.devtools) browser.devtools.input.key(event);
-    else browser?.key(event);
+    return false;
   }
 
   private applyZoom(direction: ZoomDirection) {
-    const browser = this.tabs.activeController;
-    const factor = browser?.popup ? browser.popup.zoom(direction) : browser?.zoom(direction);
-    if (factor == null) return;
-    this.showZoomHud(factor);
-  }
-
-  private followCellZoom() {
-    if (!this.root) return;
-    const { height, basePx } = this.root.info;
-    const prev = this.cellFollow;
-    this.cellFollow = { height, basePx };
-    if (!prev || !prev.basePx || !prev.height) return;
-    const ratio = basePx / prev.basePx;
-    if (!Number.isFinite(ratio) || ratio <= 0 || Math.abs(ratio - 1) < 0.01) return;
-    const paneRatio = height / prev.height;
-    if (Math.abs(paneRatio - ratio) < 0.04 * ratio) return;
-    let hud: number | null = null;
-    const active = this.tabs.activeController;
-    this.tabs.eachController((controller) => {
-      const factor = controller.scaleZoom(ratio);
-      if (controller === active) hud = factor;
-    });
-    if (active?.popup) hud = active.popup.scaleZoom(ratio);
-    if (hud != null) this.showZoomHud(hud);
+    this.tabs.activeHandle?.zoom(direction);
   }
 
   private showZoomHud(factor: number) {
-    if (this.sessionFlags.noOverlays || this.appTabActive()) return;
+    if (this.sessionFlags.noOverlays) return;
     this.zoomHud = factor;
     if (this.zoomHudTimer) clearTimeout(this.zoomHudTimer);
     this.zoomHudTimer = setTimeout(() => {
@@ -1166,7 +829,7 @@ class Session {
   }
 
   private showDownload(progress: DownloadProgress) {
-    if (this.sessionFlags.noOverlays || this.appTabActive()) return;
+    if (this.sessionFlags.noOverlays) return;
     const percent =
       progress.total > 0 ? Math.round((progress.received / progress.total) * 100) : null;
     if (
@@ -1190,7 +853,7 @@ class Session {
   }
 
   private showToast(text: string, state: "done" | "failed" | "alert", detail?: string) {
-    if (this.sessionFlags.noOverlays || this.appTabActive()) return;
+    if (this.sessionFlags.noOverlays) return;
     this.toast = { text, detail, failed: state === "failed", alert: state === "alert" };
     if (this.toastTimer) clearTimeout(this.toastTimer);
     this.toastTimer = setTimeout(() => {
@@ -1201,88 +864,52 @@ class Session {
     this.render();
   }
 
-  // fixme: ghostty doesn't support that cursor type, not sure if any terminals do
-  private syncCursor() {
-    const browser = this.tabs.activeController;
-    const shape = this.activeRecord()?.reviewing
-      ? "default"
-      : this.dividerHover
-        ? this.devtoolsDockSide === "bottom"
-          ? "row-resize"
-          : "col-resize"
-        : this.devtoolsHover
-          ? (browser?.devtools?.cursorShape ?? "default")
-          : browser?.popup
-            ? this.popupHover
-              ? browser.popup.cursorShape
-              : "default"
-            : this.pageHover
-              ? (browser?.cursorShape ?? "default")
-              : "default";
-    if (shape === this.sentCursor) return;
-    this.sentCursor = shape;
-    this.root?.setPointerShape(shape);
-  }
-
   private blurToOverlay() {
-    this.browserFocused = false;
-    const browser = this.tabs.activeController;
-    this.devtoolsWasFocused = browser?.devtoolsFocused ?? false;
-    browser?.blurDevtools();
-    browser?.blurContent();
-    this.syncCursor();
+    this.tabs.activeHandle?.blur();
   }
 
   private refocusPage() {
-    this.browserFocused = true;
-    const browser = this.tabs.activeController;
-    if (this.devtoolsWasFocused && browser?.devtools) browser.focusDevtools();
-    else browser?.focusContent();
-    this.syncCursor();
+    this.tabs.activeHandle?.focus();
   }
 
   private toggleDevtools() {
-    const browser = this.tabs.activeController;
-    if (!browser) return;
-    if (browser.devtools) browser.closeDevtools();
+    const tab = this.tabs.active;
+    if (!tab) return;
+    if (tab.devtools) this.closeDevtools();
     else this.openDevtools();
   }
 
-  private openDevtoolsConsole() {
-    const browser = this.tabs.activeController;
-    if (!browser) return;
-    this.openDevtools();
-    browser.devtools?.showPanel("console");
-    browser.focusDevtools();
-  }
-
   private toggleDevtoolsConsole() {
-    const browser = this.tabs.activeController;
-    if (!browser) return;
-    if (browser.devtools) browser.closeDevtools();
-    else this.openDevtoolsConsole();
+    const tab = this.tabs.active;
+    if (!tab) return;
+    if (tab.devtools) this.closeDevtools();
+    else this.openDevtools("console");
   }
 
-  private openDevtools() {
-    const browser = this.tabs.activeController;
-    if (!browser || !this.root || browser.devtools) return;
-    this.recalculateLayout({ dock: this.devtoolsDockSide, fraction: this.devtoolsFraction });
-    if (this.surfaceLayout) browser.resize(this.surfaceLayout);
-    if (this.devtoolsLayout) browser.openDevtools(this.devtoolsLayout, this.devtoolsDockSide);
-    browser.focusDevtools();
+  private openDevtools(panel: string | null = null) {
+    const tab = this.tabs.active;
+    if (!tab || !this.root) return;
+    tab.devtools = true;
+    this.devtoolsPanel = panel;
+    this.recalculateLayout();
+    this.render();
+  }
+
+  private closeDevtools() {
+    const tab = this.tabs.active;
+    if (!tab?.devtools) return;
+    tab.devtools = false;
+    this.devtoolsPanel = null;
+    this.recalculateLayout();
     this.render();
   }
 
   private setDevtoolsDockSide(dock: DevtoolsDock) {
-    this.rememberDock(dock);
-    if (this.tabs.activeController?.devtools) this.syncDevtoolsLayout();
-  }
-
-  private rememberDock(dock: DevtoolsDock) {
     if (this.devtoolsDockSide === dock) return;
     this.devtoolsDockSide = dock;
     this.saveDevtoolsSettings();
-    this.tabs.eachController((controller) => controller.devtools?.setDock(dock));
+    this.recalculateLayout();
+    this.render();
   }
 
   private async loadDevtoolsSettings() {
@@ -1307,22 +934,9 @@ class Session {
       .catch(() => { });
   }
 
-  private syncDevtoolsLayout(options?: { keepFrame?: boolean }) {
-    this.recalculateLayout();
-    this.resizeSplitWindows(options);
-    this.render();
-  }
-
-  private resizeSplitWindows(options?: { keepFrame?: boolean }) {
-    const browser = this.tabs.activeController;
-    if (this.surfaceLayout) browser?.resize(this.surfaceLayout, options);
-    if (this.devtoolsLayout) browser?.devtools?.resize(this.devtoolsLayout, options);
-  }
-
   private openPageMenu(params: Electron.ContextMenuParams) {
-    if (this.sessionFlags.noContextMenu || this.appTabActive() || !this.surfaceLayout) return;
+    if (this.sessionFlags.noContextMenu || !this.surfaceLayout) return;
     if (this.palette || this.newTab || this.urlEditOpen) return;
-    if (this.tabs.activeController?.popup) return;
     const scale = this.surfaceLayout.scale;
     this.pageMenu = {
       kind: "page",
@@ -1355,8 +969,9 @@ class Session {
   private runPageMenu(id: string) {
     const menu = this.pageMenu;
     this.closePageMenu();
-    const browser = this.tabs.activeController;
-    if (!menu || !browser) return;
+    const tab = this.tabs.active;
+    const handle = tab?.ref.current;
+    if (!menu || !tab || !handle) return;
     switch (id) {
       case "grab":
         void this.toggleGrab();
@@ -1365,10 +980,21 @@ class Session {
         if (this.activeRecord()) this.activeRecord()?.actions.complete();
         else void this.startRecording();
         return;
-      case "inspect":
+      case "inspect": {
+        if (menu.kind !== "page") {
+          this.openDevtools();
+          return;
+        }
+        const { pageX, pageY } = menu;
+        const contents = handle.webContents;
+        if (tab.devtools) {
+          contents.inspectElement(pageX, pageY);
+          return;
+        }
+        contents.once("devtools-opened", () => contents.inspectElement(pageX, pageY));
         this.openDevtools();
-        if (menu.kind === "page" && browser.devtools) browser.inspect(menu.pageX, menu.pageY);
         return;
+      }
     }
     if (menu.kind !== "page") return;
     switch (id) {
@@ -1385,25 +1011,26 @@ class Session {
   }
 
   private activeGrab(): Grab | null {
-    const controller = this.tabs.activeController;
-    return controller ? this.grabs.get(controller) ?? null : null;
+    const tab = this.tabs.active;
+    return tab ? this.grabs.get(tab.id) ?? null : null;
   }
 
-  private grabFor(controller: BrowserController): Grab {
-    let grab = this.grabs.get(controller);
+  private grabFor(tab: Tab, handle: WebViewHandle): Grab {
+    let grab = this.grabs.get(tab.id);
     if (!grab) {
-      grab = new Grab(controller, {
+      grab = new Grab(handle, {
         selected: (content) => void this.sendGrab(content),
       });
-      this.grabs.set(controller, grab);
+      this.grabs.set(tab.id, grab);
     }
     return grab;
   }
 
   private async toggleGrab() {
-    const controller = this.tabs.activeController;
-    if (!controller) return;
-    const grab = this.grabFor(controller);
+    const tab = this.tabs.active;
+    const handle = tab?.ref.current;
+    if (!tab || !handle) return;
+    const grab = this.grabFor(tab, handle);
     try {
       if (grab.active) await grab.deactivate();
       else {
@@ -1588,7 +1215,7 @@ class Session {
   private closeFind() {
     if (!this.findOpen) return;
     this.findOpen = false;
-    this.tabs.activeController?.stopFind();
+    this.tabs.activeHandle?.stopFind();
     this.root?.setKeyCapture([]);
     this.refocusPage();
     this.render();
@@ -1619,6 +1246,7 @@ class Session {
   }
 
   private paletteActions(): PaletteAction[] {
+    const devtoolsOpen = this.tabs.active?.devtools ?? false;
     return [
       {
         id: "find",
@@ -1649,11 +1277,11 @@ class Session {
       },
       {
         id: "devtools",
-        label: this.tabs.activeController?.devtools ? "close devtools" : "open devtools",
+        label: devtoolsOpen ? "close devtools" : "open devtools",
         shortcut: bindingLabel(this.devtoolsBinding),
         run: () => this.toggleDevtools(),
       },
-      ...(this.tabs.activeController?.devtools
+      ...(devtoolsOpen
         ? [
           {
             id: "devtools-dock",
@@ -1687,55 +1315,29 @@ class Session {
     const reviewing = this.activeRecord()?.reviewing ?? false;
     const result = computeLayout(
       this.root.info,
-      this.displayScale,
-      this.hideToolbar || this.bareChrome(),
-      this.noFrame || this.bareChrome(),
+      this.root.displayScale,
+      this.hideToolbar,
+      this.noFrame,
       reviewing ? null : placement,
       reviewing ? recordBarHeight(this.root.info) : 0,
     );
     this.layout = result.chrome;
     this.surfaceLayout = result.surface;
-    this.devtoolsLayout = result.devtools;
   }
 
   private devtoolsPlacement(): DevtoolsPlacement | null {
-    return this.tabs.activeController?.devtools
+    return this.tabs.active?.devtools
       ? { dock: this.devtoolsDockSide, fraction: this.devtoolsFraction }
       : null;
   }
 
-  // this is scary code, popusp in general
-  private popupView(): PopupView | null {
-    const popup = this.tabs.activeController?.popup;
-    if (!popup || !this.layout || !this.surfaceLayout) return null;
-    const scale = this.surfaceLayout.scale;
-    const headerPx = Math.round(this.layout.rem * 1.7);
-    const maxW = Math.round(this.layout.page.width * 0.94);
-    const maxH = Math.round(this.layout.page.height * 0.94) - headerPx;
-    let host = "";
-    try {
-      host = new URL(popup.state.url).host;
-    } catch { }
-    return {
-      title: popup.state.title,
-      host,
-      loading: popup.state.loading,
-      width: Math.max(60, Math.min(Math.round(popup.state.width * scale), maxW)),
-      height: Math.max(60, Math.min(Math.round(popup.state.height * scale), maxH)),
-    };
-  }
-
-  private hostDisplayScale() {
-    const explicit = Number(this.ctx.env.TERMINAL_BROWSER_DISPLAY_SCALE);
-    if (Number.isFinite(explicit) && explicit > 0) return explicit;
-    if (this.terminal?.reportsCssPixels) return 1;
-    // this is a bit hacky i would like to improve on it
-    return screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).scaleFactor;
+  private resolveInput(text: string): string {
+    return normalizeUrl(searchOrUrl(text, this.ctx.cwd), this.ctx.cwd);
   }
 
   private initialUrl(): string {
     const arg = this.argv.find((argument) => !argument.startsWith("-"));
-    if (arg) return arg;
+    if (arg) return normalizeUrl(arg, this.ctx.cwd);
     try {
       const last = lastUrl()?.trim();
       if (last && /^https?:\/\//.test(last)) return last;
@@ -1791,4 +1393,3 @@ function rememberUrl(url: string) {
     setLastUrl(url);
   } catch { }
 }
-

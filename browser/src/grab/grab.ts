@@ -1,12 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { app } from "electron";
+import type { WebViewHandle } from "terminal-electron";
 import { bundledAsset } from "../assets";
-import type { BrowserController } from "../page/controller";
 
 const CHANNEL = "grab";
 const PLUGIN = "terminal-browser";
 const SCRIPT_ASSET = "react-grab/index.global.js";
+const BINDING = "__pixelEmit";
 
 let librarySource: string | null = null;
 function reactGrabLibrary(): string {
@@ -18,7 +19,7 @@ function reactGrabLibrary(): string {
 }
 
 const REGISTER_PLUGIN = `(api) => {
-  const emit = (data) => window.__pixelEmit?.(JSON.stringify({ channel: ${JSON.stringify(CHANNEL)}, data }));
+  const emit = (data) => window.${BINDING}?.(JSON.stringify({ channel: ${JSON.stringify(CHANNEL)}, data }));
   const overlay = document.querySelector("[data-react-grab]")?.shadowRoot;
   if (overlay && !overlay.querySelector("#${PLUGIN}-style")) {
     const style = document.createElement("style");
@@ -50,7 +51,7 @@ export function reactGrabPreloadPath(): string {
     preloadFile = path.join(app.getPath("userData"), "terminal-browser-react-grab-preload.js");
     fs.writeFileSync(
       preloadFile,
-      `if (process.isMainFrame && !process.argv.some((arg) => arg.startsWith("--terminal-browser-app-tab="))) {
+      `if (process.isMainFrame) {
   const { webFrame } = require("electron");
   void webFrame.executeJavaScript(${JSON.stringify(early)});
 }
@@ -80,24 +81,43 @@ export interface GrabHooks {
 
 export class Grab {
   active = false;
+  private readonly onMessage = (_event: unknown, method: string, params: unknown) => {
+    if (method === "Page.frameNavigated") {
+      const frame = (params as { frame?: { parentId?: string } }).frame;
+      if (!frame?.parentId) this.active = false;
+      return;
+    }
+    if (method !== "Runtime.bindingCalled") return;
+    const call = params as { name: string; payload: string };
+    if (call.name !== BINDING) return;
+    try {
+      const message = JSON.parse(call.payload) as { channel: string; data: GrabMessage };
+      if (message.channel === CHANNEL) this.receive(message.data);
+    } catch {}
+  };
+  private listening = false;
 
   constructor(
-    private readonly controller: BrowserController,
+    private readonly view: WebViewHandle,
     private readonly hooks: GrabHooks,
-  ) {
-    controller.onEmit(CHANNEL, (data) => this.receive(data as GrabMessage));
-    controller.onCdpEvent("Page.frameNavigated", (params) => {
-      const frame = (params as { frame?: { parentId?: string } }).frame;
-      const mainFrameNavigated = !frame?.parentId;
-      if (mainFrameNavigated) this.active = false;
-    });
+  ) {}
+
+  private async listen(): Promise<void> {
+    if (this.listening) return;
+    this.listening = true;
+    await this.view.cdp("Runtime.addBinding", { name: BINDING });
+    this.view.webContents.debugger.on("message", this.onMessage);
+  }
+
+  private runJs(source: string): Promise<unknown> {
+    return this.view.webContents.executeJavaScript(source, true);
   }
 
   async activate(): Promise<void> {
-    await this.controller.attachCdp();
-    const loaded = await this.controller.runJs("Boolean(window.__REACT_GRAB__)");
-    if (!loaded) await this.controller.runJs(reactGrabLibrary());
-    const result = await this.controller.runJs(ACTIVATE_SCRIPT);
+    await this.listen();
+    const loaded = await this.runJs("Boolean(window.__REACT_GRAB__)");
+    if (!loaded) await this.runJs(reactGrabLibrary());
+    const result = await this.runJs(ACTIVATE_SCRIPT);
     if (result !== "active") {
       throw new Error("react-grab failed to start");
     }
@@ -106,12 +126,15 @@ export class Grab {
 
   async deactivate(): Promise<void> {
     this.active = false;
-    await this.controller.runJs(DEACTIVATE_SCRIPT).catch(() => {});
+    await this.runJs(DEACTIVATE_SCRIPT).catch(() => {});
   }
 
   dispose() {
-    this.controller.onEmit(CHANNEL, null);
-    this.controller.onCdpEvent("Page.frameNavigated", null);
+    if (!this.listening) return;
+    this.listening = false;
+    try {
+      this.view.webContents.debugger.removeListener("message", this.onMessage);
+    } catch {}
   }
 
   private receive(message: GrabMessage) {

@@ -1,5 +1,5 @@
-import { callerTty } from "pixel-terminals";
-import type { Direction, Pane, Terminal } from "pixel-terminals";
+import { callerTty } from "terminal-electron/terminal";
+import type { Direction, Pane, Terminal } from "terminal-electron/terminal";
 
 import { control } from "./control";
 import { instances } from "./registry";

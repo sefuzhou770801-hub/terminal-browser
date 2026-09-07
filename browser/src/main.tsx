@@ -6,7 +6,7 @@ import { app, screen } from "electron";
 
 import { runDaemon } from "./daemon";
 import { LOGS_DIR, ensureDataDir } from "pixel-store";
-import { appLog } from "pixel-react";
+import { appLog } from "terminal-electron";
 import { claimProfile } from "./profile";
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
 app.commandLine.appendSwitch("disable-background-timer-throttling");

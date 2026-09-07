@@ -21,22 +21,11 @@ Options:
   --ssh <user@host>     Perform all network requests through a remote server, then
                         proxy the result back to the local terminal-browser instance
   --ssh-bundle <dir>    Install and execute a bundle on a remote server. This is useful when paired with
-                        --app-mode and --ssh, allowing you to run an application server on a
+                        --ssh, allowing you to run an application server on a
                         remote machine, then view the output over ssh
   --ssh-bundle-dir <dir>
                         The path --ssh-bundle should be installed to through the ssh server. Defaults to
                         \${XDG_DATA_HOME:-~/.local/share}/terminal-browser/bundles
-  --preload=<path>      Run a script inside the context of a web page before it loads (uses electron's preload feature under the hood, runs in an isolated world).
-                        terminal-browser specific api's are exposed on globalThis.terminalBrowser
-                        {
-                          theme: () => { background: [r,g,b], foreground: [r,g,b], ansi: ([r,g,b] | null)[] } | null, // null until the terminal reports its colors
-                          onTheme: (cb: (theme: Theme) => void) => () => void, // returns unsubscribe
-                          quit: () => void // closes this browser window
-                        }
-                        --terminal-browser-session=<key> is passed as extra arguments to the renderer process, available via process.argv
-  --main-script=<path>  Run a node.js script in the same process as the browser (this is an electron main process)
-  --open-tabs-in-popup-stack Links that would open a new tab open a popup over the
-                        page instead.
   --allow-clipboard-read
                         Lets websites read from clipboard.
   --no-toolbar          No toolbar or tab strip
@@ -44,9 +33,6 @@ Options:
   --no-context-menu     No right-click menu
   --no-overlays         No toasts or HUDs drawn over the page
   --no-frame            No border or padding around the web page
-  --app-mode            Enables configuration to disable terminal-browser features to make optimal for application embedding
-  --app-name=<name>     The name of the application
-  --app-id=<id>         The identifier of the application
   --no-merge            Do not open the terminal-browser instance as a tab in a neighbor terminal-browser
 
 

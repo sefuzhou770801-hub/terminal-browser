@@ -1,4 +1,4 @@
-import type { EngineInfo, Rgba } from "pixel-react";
+import type { EngineInfo, Rgba } from "terminal-electron";
 
 export interface Theme {
   bg: Rgba;
