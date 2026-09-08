@@ -2,9 +2,7 @@ packages:
   - browser
   - cli
   - store
-  - terminal-electron/packages/terminal-electron
-  - terminal-electron/packages/native/*
 onlyBuiltDependencies:
   - better-sqlite3
-  - electron
   - esbuild
+  - terminal-electron

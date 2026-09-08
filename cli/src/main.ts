@@ -35,8 +35,7 @@ import { findHosts, openInHost } from "./interop";
 import { lsCommand } from "./ls";
 import { instances } from "./registry";
 import { apparmorSetup, deniedRefusal, linuxSandboxError, sandboxRefusal } from "./sandbox";
-import { openSshTunnel, startBundle, validateBundleDir, validateSshTarget } from "./ssh";
-import type { RemoteBundle } from "./ssh";
+import { connectSsh, validateBundleDir, validateSshTarget } from "terminal-electron/ssh";
 import type { InstanceRecord } from "./registry";
 import { installedVersion, upgradeCommand } from "./upgrade";
 
@@ -84,9 +83,9 @@ function browserDirectory(): string {
 }
 
 function electronBinary(): string {
-  return DIST_ROOT
-    ? path.join(DIST_ROOT, "electron", ...ELECTRON_DIST_BIN)
-    : path.join(browserDirectory(), "node_modules", "electron", "dist", ...ELECTRON_DEV_BIN);
+  if (DIST_ROOT) return path.join(DIST_ROOT, "electron", ...ELECTRON_DIST_BIN);
+  const library = require.resolve("terminal-electron/package.json", { paths: [browserDirectory()] });
+  return path.join(path.dirname(library), "electron", "dist", ...ELECTRON_DEV_BIN);
 }
 
 function browserLaunchCommand(argv: string[]): { command: string[]; cwd: string } {
@@ -363,25 +362,17 @@ function flagEq(argv: string[], flag: string): string | undefined {
 async function sshSetup(argv: string[]): Promise<void> {
   const target = flagEq(argv, "--ssh");
   if (!target) return;
-  const status = (line: string) => process.stdout.write(`ssh: ${line}\n`);
   const interrupt = () => process.exit(130);
   const signals = ["SIGINT", "SIGTERM", "SIGHUP"] as const;
   for (const signal of signals) process.on(signal, interrupt);
-  let bundle: RemoteBundle | null = null;
-  const tunnel = await openSshTunnel(target, status);
-  process.on("exit", () => {
-    try {
-      bundle?.stop();
-    } catch {}
-    tunnel.stop();
+  const session = await connectSsh({
+    target,
+    bundle: flagEq(argv, "--ssh-bundle") || undefined,
+    remoteBase: flagEq(argv, "--ssh-bundle-dir") || undefined,
+    status: (line) => process.stdout.write(`ssh: ${line}\n`),
   });
-  argv.push(`--socks-port=${tunnel.socksPort}`);
-  const bundleDir = flagEq(argv, "--ssh-bundle");
-  if (bundleDir) {
-    const remoteBase = flagEq(argv, "--ssh-bundle-dir");
-    bundle = await startBundle(tunnel, bundleDir, status, remoteBase || undefined);
-    if (!argv.some((arg) => !arg.startsWith("-"))) argv.unshift(bundle.url);
-  }
+  argv.push(`--socks-port=${session.socksPort}`);
+  if (session.url && !argv.some((arg) => !arg.startsWith("-"))) argv.unshift(session.url);
   for (const signal of signals) process.removeListener(signal, interrupt);
 }
 
@@ -465,7 +456,7 @@ async function newTabCommand(url: string | undefined, key: string | undefined): 
     print(await control(target.socket, where));
     return 0;
   }
-  if (!key && !mergeDisabled() && (await tryAdopt(url ? [url] : []))) return 0;
+  if (!key && !mergeDisabled() && (await tryAdopt(url ? [url] : [], null))) return 0;
   await requireGraphics(check);
   const argv = url ? [url] : [];
   if (interactiveTty()) return openHere(argv);
@@ -485,11 +476,6 @@ async function requireGraphics(check: TerminalCheck) {
 }
 
 const BROWSER_FLAGS = [
-  "--no-toolbar",
-  "--no-shortcuts",
-  "--no-context-menu",
-  "--no-overlays",
-  "--no-frame",
   "--allow-clipboard-read",
   "--ssh=",
   "--ssh-bundle=",
@@ -502,13 +488,33 @@ const BROWSER_FLAGS = [
   "--parent-tty=",
 ];
 
+const APP_MODE_FLAGS = [
+  "--app-mode",
+  "--preload",
+  "--main-script",
+  "--app-name",
+  "--app-id",
+  "--open-tabs-in-popup-stack",
+  "--no-toolbar",
+  "--no-shortcuts",
+  "--no-context-menu",
+  "--no-overlays",
+  "--no-frame",
+];
+
 function rejectUnknownFlags(args: string[]) {
   for (const arg of args) {
     if (!arg.startsWith("-")) continue;
+    const name = arg.split("=")[0];
+    if (APP_MODE_FLAGS.includes(name)) {
+      fail(
+        `[placeholder copy: ${name} is deprecated: app mode was removed from terminal-browser. Build the app on terminal-electron instead, see https://terminal-electron.com/docs]`,
+      );
+    }
     const known = BROWSER_FLAGS.some((flag) =>
       flag.endsWith("=") ? arg.startsWith(flag) : arg === flag,
     );
-    if (!known) fail(`unknown option ${arg.split("=")[0]} (terminal-browser open --help)`);
+    if (!known) fail(`unknown option ${name} (terminal-browser open --help)`);
   }
 }
 
@@ -545,10 +551,23 @@ function mergeDisabled(): boolean {
   return process.env.TERMINAL_BROWSER_NO_MERGE === "1";
 }
 
-async function tryAdopt(args: string[]): Promise<boolean> {
+// Opens the url as a tab in a browser that is already on screen. With a
+// direction, only the browser in the pane directly on that side qualifies, so
+// a --split lands as a tab exactly where the new pane would have appeared.
+// Without one, only an explicitly targeted browser does.
+async function tryAdopt(args: string[], direction: Direction | null): Promise<boolean> {
   const terminal = (await currentTerminal()).terminal;
-  const hosts = await findHosts(terminal).catch(() => []);
+  let hosts = await findHosts(terminal).catch(() => []);
   if (hosts.length === 0) return false;
+  if (direction) {
+    if (!terminal?.neighbor || !terminal.getCurrentPane) return false;
+    const current = await terminal.getCurrentPane({ tty: callerTty().path, cwd: process.cwd() }).catch(() => null);
+    if (!current) return false;
+    const beside = await terminal.neighbor(current, direction).catch(() => null);
+    if (!beside) return false;
+    hosts = hosts.filter((host) => host.pane === beside.id);
+    if (hosts.length === 0) return false;
+  }
   const url = args.find((arg) => !arg.startsWith("-"));
   const resolved = url && fs.existsSync(url) ? path.resolve(url) : url;
   for (const host of hosts) {
@@ -582,9 +601,8 @@ async function openCommand(args: string[]) {
     fail(`unexpected ${positionals[1]} (one url; --split <direction> opens a new pane)`);
   }
   const targeted = Boolean(process.env.TERMINAL_BROWSER_INTEROP_TARGET);
-  const wouldSplit = split !== null || !interactiveTty();
-  if (!noMerge && (wouldSplit || targeted) && !args.some((arg) => arg.startsWith("--ssh="))) {
-    if (await tryAdopt(args)) return;
+  if (!noMerge && (split !== null || targeted) && !args.some((arg) => arg.startsWith("--ssh="))) {
+    if (await tryAdopt(args, targeted ? null : split)) return;
   }
   await requireGraphics(await currentTerminal());
   if (!split && interactiveTty()) {

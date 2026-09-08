@@ -1,8 +1,7 @@
 import { spawn } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
 
-import { app, session as electronSession } from "electron";
+import { app } from "electron";
 import { createRoot } from "terminal-electron";
 import type {
   DevtoolsDock,
@@ -99,10 +98,6 @@ function bundledFontPath(): string {
   return found;
 }
 
-function persistentPartition(partition: string): string {
-  return partition.startsWith("persist:") ? partition : `persist:${partition}`;
-}
-
 interface NewTabState {
   query: string;
   suggestions: string[];
@@ -141,6 +136,7 @@ function initialState(url: string): WebViewState {
     canGoForward: false,
     findMatches: null,
     zoom: 1,
+    favicon: null,
   };
 }
 
@@ -151,12 +147,7 @@ class Session {
   private ownPane: Pane | null = null;
   private finding: Promise<Pane | null> | null = null;
   private readonly argv: string[];
-  private readonly hideToolbar: boolean;
-  private readonly noFrame: boolean;
   private readonly sessionFlags: {
-    noShortcuts: boolean;
-    noContextMenu: boolean;
-    noOverlays: boolean;
     clipboardRead: boolean;
   };
   private paletteApps: RegisteredApp[] = [];
@@ -227,12 +218,7 @@ class Session {
       cwd: ctx.cwd,
       self: () => this.findOwnPane(),
     });
-    this.hideToolbar = this.argv.includes("--no-toolbar");
-    this.noFrame = this.argv.includes("--no-frame");
     this.sessionFlags = {
-      noShortcuts: this.argv.includes("--no-shortcuts"),
-      noContextMenu: this.argv.includes("--no-context-menu"),
-      noOverlays: this.argv.includes("--no-overlays"),
       clipboardRead: this.argv.includes("--allow-clipboard-read"),
     };
     const sshTarget = flagValue(this.argv, "--ssh");
@@ -281,7 +267,6 @@ class Session {
   private lastZoom = 1;
 
   async start(): Promise<void> {
-    if (this.socksPort) await this.routeThroughSocksProxy(this.socksPort);
     if (process.platform === "darwin") app.dock?.hide();
     await this.loadDevtoolsSettings();
     if (!this.ctx.tty) process.stdout.write(`\x1b]2;${this.marker}\x07`);
@@ -340,20 +325,6 @@ class Session {
     void this.findOwnPane();
     this.render();
   }
-
-  private async routeThroughSocksProxy(port: number): Promise<void> {
-    const target = this.partition
-      ? electronSession.fromPartition(persistentPartition(this.partition))
-      : electronSession.defaultSession;
-    app.on("web-contents-created", (_event, contents) => {
-      if (contents.session === target) contents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
-    });
-    await target.setProxy({
-      proxyRules: `socks5://127.0.0.1:${port}`,
-      proxyBypassRules: "<-loopback>",
-    });
-  }
-
 
   private findOwnPane(): Promise<Pane | null> {
     if (this.ownPane) return Promise.resolve(this.ownPane);
@@ -445,6 +416,7 @@ class Session {
       ref: tab.ref,
       active: tab.id === active?.id,
       partition: this.partition,
+      proxy: this.socksPort ? `socks5://127.0.0.1:${this.socksPort}` : null,
       preload: this.browserPreload,
       clipboardRead: this.sessionFlags.clipboardRead,
     }));
@@ -482,7 +454,6 @@ class Session {
             : null
         }
         urlEdit={this.urlEditOpen}
-        noOverlays={this.sessionFlags.noOverlays}
         zoomHud={this.zoomHud}
         download={this.download}
         toast={this.toast}
@@ -692,11 +663,10 @@ class Session {
   // Returns true when the browser consumed the key; anything else reaches the
   // focused page through terminal-electron.
   private handleKey(event: EngineKeyEvent): boolean {
-    const noShortcuts = this.sessionFlags.noShortcuts;
     const handle = this.tabs.activeHandle;
     if (event.kind === "release") return false;
     const quitKey = event.key === "q" || (process.platform === "darwin" && event.key === "c");
-    if (!noShortcuts && event.mods.ctrl && quitKey) {
+    if (event.mods.ctrl && quitKey) {
       this.shutdown();
       return true;
     }
@@ -745,7 +715,7 @@ class Session {
       return true;
     }
     if (!this.findOpen && this.activeRecord()?.handleKey(event)) return true;
-    if (!noShortcuts) {
+    {
       if (isRecordKey(event)) {
         if (!this.activeRecord()) void this.startRecording();
         return true;
@@ -787,7 +757,7 @@ class Session {
       handle?.findNext(!event.mods.shift);
       return true;
     }
-    if (!noShortcuts) {
+    {
       if (this.accelHeld(event) && event.key === "r") {
         this.activeRecord()?.reloaded();
         handle?.reload();
@@ -801,7 +771,7 @@ class Session {
         handle?.forward();
         return true;
       }
-      if (this.cmdHeld(event)) {
+      if (this.cmdHeld(event) || event.mods.ctrl) {
         const direction = zoomDirection(event.key);
         if (direction !== null) {
           this.applyZoom(direction);
@@ -817,7 +787,6 @@ class Session {
   }
 
   private showZoomHud(factor: number) {
-    if (this.sessionFlags.noOverlays) return;
     this.zoomHud = factor;
     if (this.zoomHudTimer) clearTimeout(this.zoomHudTimer);
     this.zoomHudTimer = setTimeout(() => {
@@ -829,7 +798,6 @@ class Session {
   }
 
   private showDownload(progress: DownloadProgress) {
-    if (this.sessionFlags.noOverlays) return;
     const percent =
       progress.total > 0 ? Math.round((progress.received / progress.total) * 100) : null;
     if (
@@ -853,7 +821,6 @@ class Session {
   }
 
   private showToast(text: string, state: "done" | "failed" | "alert", detail?: string) {
-    if (this.sessionFlags.noOverlays) return;
     this.toast = { text, detail, failed: state === "failed", alert: state === "alert" };
     if (this.toastTimer) clearTimeout(this.toastTimer);
     this.toastTimer = setTimeout(() => {
@@ -935,7 +902,7 @@ class Session {
   }
 
   private openPageMenu(params: Electron.ContextMenuParams) {
-    if (this.sessionFlags.noContextMenu || !this.surfaceLayout) return;
+    if (!this.surfaceLayout) return;
     if (this.palette || this.newTab || this.urlEditOpen) return;
     const scale = this.surfaceLayout.scale;
     this.pageMenu = {
@@ -1275,6 +1242,9 @@ class Session {
         shortcut: grabKeyLabel,
         run: () => void this.toggleGrab(),
       },
+      { id: "zoom-in", label: "zoom in", shortcut: "ctrl+=", run: () => this.applyZoom(1) },
+      { id: "zoom-out", label: "zoom out", shortcut: "ctrl+-", run: () => this.applyZoom(-1) },
+      { id: "zoom-reset", label: "reset zoom", shortcut: "ctrl+0", run: () => this.applyZoom(0) },
       {
         id: "devtools",
         label: devtoolsOpen ? "close devtools" : "open devtools",
@@ -1316,8 +1286,6 @@ class Session {
     const result = computeLayout(
       this.root.info,
       this.root.displayScale,
-      this.hideToolbar,
-      this.noFrame,
       reviewing ? null : placement,
       reviewing ? recordBarHeight(this.root.info) : 0,
     );

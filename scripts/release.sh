@@ -16,16 +16,20 @@ case "$(uname -s)-$(uname -m)" in
 esac
 
 rm -rf "$OUT"
-mkdir -p "$STAGE"/{bin,cli/dist,browser/dist,electron,agent-browser/bin,assets/fonts,scripts}
+mkdir -p "$STAGE"/{bin,cli/dist,browser/dist,browser/node_modules,electron,agent-browser/bin,assets/fonts,scripts}
 
-# terminal-electron resolves its engine binary and scroll helper from this package at runtime
-NATIVE_PKG="$ROOT/terminal-electron/packages/native/$TARGET"
-if [ ! -f "$NATIVE_PKG/pixel.node" ]; then
-  echo "refusing to build: $NATIVE_PKG has no pixel.node (run: pnpm --filter terminal-electron build:native -- --release)" >&2
+# terminal-electron resolves its engine binary and scroll helper from this package at runtime;
+# it comes from npm, or from a local checkout after scripts/link-terminal-electron.sh
+NATIVE_PKG="$(node -e '
+  const lib = require.resolve("terminal-electron/package.json", { paths: [process.argv[1]] });
+  const pkg = require.resolve(`terminal-electron-native-${process.argv[2]}/package.json`, { paths: [require("path").dirname(lib)] });
+  process.stdout.write(require("fs").realpathSync(require("path").dirname(pkg)));
+' "$ROOT/browser" "$TARGET" 2>/dev/null || true)"
+if [ -z "$NATIVE_PKG" ] || [ ! -f "$NATIVE_PKG/pixel.node" ]; then
+  echo "refusing to build: terminal-electron-native-$TARGET is not installed in browser/ (pnpm install, or scripts/link-terminal-electron.sh for a local checkout)" >&2
   exit 1
 fi
-mkdir -p "$STAGE/browser/node_modules/@terminal-electron"
-cp -RL "$NATIVE_PKG" "$STAGE/browser/node_modules/@terminal-electron/native-$TARGET"
+cp -RL "$NATIVE_PKG" "$STAGE/browser/node_modules/terminal-electron-native-$TARGET"
 if [ -n "$DARWIN_ARCH" ]; then
   cp "$NATIVE_PKG/native-scroll-helper" "$STAGE/bin/native-scroll-helper"
 fi
@@ -47,9 +51,13 @@ cp "$ROOT/assets/fonts/JetBrainsMono-Regular.ttf" "$STAGE/assets/fonts/"
 mkdir -p "$STAGE/assets/react-grab"
 cp "$ROOT/assets/react-grab/"* "$STAGE/assets/react-grab/"
 
-ELECTRON_DIST="$(node -e 'const p=require("path");console.log(p.join(p.dirname(require.resolve("electron/package.json",{paths:[process.argv[1]]})),"dist"))' "$ROOT/browser")"
+ELECTRON_DIST="$(node -e '
+  const p = require("path");
+  const lib = require.resolve("terminal-electron/package.json", { paths: [process.argv[1]] });
+  console.log(p.join(p.dirname(lib), "electron", "dist"));
+' "$ROOT/browser")"
 if [ ! -f "$ELECTRON_DIST/.zenbu-electron-sha256" ]; then
-  echo "refusing to build: installed electron does not come from https://github.com/zenbu-labs/electron-releases" >&2
+  echo "refusing to build: terminal-electron has not installed its patched electron (run pnpm install)" >&2
   exit 1
 fi
 if [ -n "$DARWIN_ARCH" ]; then

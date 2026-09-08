@@ -89,17 +89,13 @@ export function recordBarHeight(info: EngineInfo): number {
 export function computeLayout(
   info: EngineInfo,
   scale: number,
-  hideToolbar: boolean,
-  frameless: boolean,
   devtools: DevtoolsPlacement | null,
   recordBar = 0,
 ): SessionLayout {
-  const toolbarHeight = hideToolbar
-    ? 0
-    : Math.min(info.height - info.cellHeight, Math.round(info.basePx * 2.1));
-  const pad = frameless ? 0 : Math.round(info.basePx * 0.45);
-  const padLeft = frameless ? 0 : Math.round(info.basePx * 0.2);
-  const padBottom = frameless ? 0 : Math.round(info.basePx * 0.2);
+  const toolbarHeight = Math.min(info.height - info.cellHeight, Math.round(info.basePx * 2.1));
+  const pad = Math.round(info.basePx * 0.45);
+  const padLeft = Math.round(info.basePx * 0.2);
+  const padBottom = Math.round(info.basePx * 0.2);
   const chrome: ChromeLayout = {
     width: info.width,
     height: info.height,
@@ -113,7 +109,6 @@ export function computeLayout(
       height: Math.max(1, info.height - toolbarHeight - padBottom - recordBar),
     },
     devtools: null,
-    frame: !frameless,
     rem: info.basePx,
   };
   const gap = Math.max(2, Math.round(info.basePx * 0.25));

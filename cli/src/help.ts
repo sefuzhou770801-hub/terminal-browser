@@ -25,14 +25,9 @@ Options:
                         remote machine, then view the output over ssh
   --ssh-bundle-dir <dir>
                         The path --ssh-bundle should be installed to through the ssh server. Defaults to
-                        \${XDG_DATA_HOME:-~/.local/share}/terminal-browser/bundles
+                        \${XDG_DATA_HOME:-~/.local/share}/terminal-electron/bundles
   --allow-clipboard-read
                         Lets websites read from clipboard.
-  --no-toolbar          No toolbar or tab strip
-  --no-shortcuts        No browser shortcuts
-  --no-context-menu     No right-click menu
-  --no-overlays         No toasts or HUDs drawn over the page
-  --no-frame            No border or padding around the web page
   --no-merge            Do not open the terminal-browser instance as a tab in a neighbor terminal-browser
 
 

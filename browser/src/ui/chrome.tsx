@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Box, DevTools, Text, WebView } from "terminal-electron";
+import { Box, DevTools, WebView } from "terminal-electron";
 import type { EngineInfo, Surface } from "terminal-electron";
 import type { WebViewState } from "terminal-electron";
 import { Icon } from "./icons";
@@ -43,7 +43,6 @@ export function Chrome({
   tabs,
   newTab,
   urlEdit,
-  noOverlays,
   zoomHud,
   download,
   toast,
@@ -65,7 +64,6 @@ export function Chrome({
   tabs: TabRow[];
   newTab: NewTabView | null;
   urlEdit: boolean;
-  noOverlays: boolean;
   zoomHud: number | null;
   download: DownloadView | null;
   toast: { text: string; detail?: string; failed: boolean; alert: boolean } | null;
@@ -78,9 +76,8 @@ export function Chrome({
   devtools: DevtoolsView | null;
 }) {
   const theme = useMemo(() => makeTheme(colors), [colors]);
-  const progress = useProgress(!noOverlays && state.loading);
-  const agentActive =
-    !noOverlays && tabs.some((tab) => tab.active && tab.agentControlled);
+  const progress = useProgress(state.loading);
+  const agentActive = tabs.some((tab) => tab.active && tab.agentControlled);
   const glowPulse = usePulse(agentActive);
   return (
     <Box
@@ -166,7 +163,7 @@ export function Chrome({
               width: layout.page.width + 2,
               height: Math.round(layout.rem * 2),
               flexShrink: 0,
-              cornerRadius: layout.frame ? layout.rem * 0.55 : 0,
+              cornerRadius: layout.rem * 0.55,
               border: {
                 width: Math.max(2, Math.round(layout.rem * 0.12)),
                 color: theme.accent,
@@ -352,9 +349,7 @@ function AgentGlow({
     Math.max(12, Math.round(layout.rem * 1.6)),
     Math.floor(Math.min(page.width, page.height) / 2),
   );
-  const base = layout.frame
-    ? seamRadius(Math.max(2, layout.rem * 0.55 - 1), dock, "page")
-    : 0;
+  const base = seamRadius(Math.max(2, layout.rem * 0.55 - 1), dock, "page");
   const r =
     typeof base === "number"
       ? { topLeft: base, topRight: base, bottomRight: base, bottomLeft: base }
@@ -445,18 +440,16 @@ function BrowserTabContents({
   const dock = layout.devtools?.dock ?? null;
   return (
     <>
-      {layout.frame && (
-        <Box
-          style={{
-            position: "absolute",
-            inset: { top: layout.page.y - 1, left: layout.page.x - 1 },
-            width: layout.page.width + 2,
-            height: layout.page.height + 2,
-            cornerRadius: seamRadius(layout.rem * 0.55, dock, "page"),
-            border: { width: 1, color: agentActive ? theme.accent : theme.fieldBorder },
-          }}
-        />
-      )}
+      <Box
+        style={{
+          position: "absolute",
+          inset: { top: layout.page.y - 1, left: layout.page.x - 1 },
+          width: layout.page.width + 2,
+          height: layout.page.height + 2,
+          cornerRadius: seamRadius(layout.rem * 0.55, dock, "page"),
+          border: { width: 1, color: agentActive ? theme.accent : theme.fieldBorder },
+        }}
+      />
       {tabs.map((tab) => (
         <WebView
           key={tab.id}
@@ -466,6 +459,7 @@ function BrowserTabContents({
           autoFocus={tab.active}
           devtools={false}
           partition={tab.partition ?? undefined}
+          proxy={tab.proxy ?? undefined}
           preload={tab.preload ?? undefined}
           clipboardRead={tab.clipboardRead}
           style={{
@@ -473,12 +467,10 @@ function BrowserTabContents({
             inset: { top: layout.page.y, left: layout.page.x },
             width: layout.page.width,
             height: layout.page.height,
-            cornerRadius: layout.frame
-              ? seamRadius(Math.max(2, layout.rem * 0.55 - 1), dock, "page")
-              : 0,
+            cornerRadius: seamRadius(Math.max(2, layout.rem * 0.55 - 1), dock, "page"),
             background: theme.bg,
           }}
-          onState={(state) => tabActions.state(tab.id, state)}
+          onChange={(state) => tabActions.state(tab.id, state)}
           onOpenWindow={(details) => tabActions.openWindow(tab.id, details)}
           onContextMenu={(params) => tabActions.contextMenu(tab.id, params)}
           onDownload={(progress) => tabActions.download(progress)}

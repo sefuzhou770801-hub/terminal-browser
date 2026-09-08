@@ -83,6 +83,7 @@ export class TabManager {
         canGoForward: false,
         findMatches: null,
         zoom: 1,
+        favicon: null,
       },
       targetId: null,
       agentControlAt: null,
@@ -257,7 +258,7 @@ export class TabManager {
     return this.tabs.map((tab) => ({
       id: tab.id,
       title: this.label(tab),
-      favicon: null,
+      favicon: tab.state.favicon,
       active: tab.id === this.activeId,
       agentControlled: tab.agentControlAt != null,
     }));

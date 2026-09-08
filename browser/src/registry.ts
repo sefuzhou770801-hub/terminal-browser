@@ -81,7 +81,6 @@ export class Registry {
   record(): InstanceRow {
     return {
       ...this.host.state(),
-      favicon: null,
       tabs: this.host.tabs(),
       viewport: this.host.viewport(),
       pid: process.pid,
@@ -170,6 +169,7 @@ export class Registry {
       }
       case "targets":
         return { ...this.record(), tabs: await this.host.targets() };
+        // dont love this name
       case "activate-tab": {
         if (request.tab === undefined) throw new Error("activate-tab needs a tab id");
         if (!this.host.activateTab(request.tab)) throw new Error(`no tab ${request.tab}`);

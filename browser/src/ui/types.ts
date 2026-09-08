@@ -98,7 +98,6 @@ export interface ChromeLayout {
     height: number;
     dock: "bottom" | "right";
   } | null;
-  frame: boolean;
   rem: number;
 }
 
@@ -108,6 +107,7 @@ export interface TabView {
   ref: RefObject<WebViewHandle>;
   active: boolean;
   partition: string | null;
+  proxy: string | null;
   preload: string | null;
   clipboardRead: boolean;
 }
