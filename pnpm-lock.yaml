@@ -4,9 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  terminal-electron-native-darwin-arm64: file:../terminal-electron/packages/native/darwin-arm64
-
 importers:
 
   .:
@@ -30,8 +27,8 @@ importers:
         specifier: 0.2.0
         version: 0.2.0(react@18.3.1)
       terminal-electron:
-        specifier: file:../../terminal-electron/packages/terminal-electron
-        version: file:../terminal-electron/packages/terminal-electron(react@18.3.1)
+        specifier: 0.0.7
+        version: 0.0.7(react@18.3.1)
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -49,8 +46,8 @@ importers:
         specifier: workspace:*
         version: link:../store
       terminal-electron:
-        specifier: file:../../terminal-electron/packages/terminal-electron
-        version: file:../terminal-electron/packages/terminal-electron(react@18.3.1)
+        specifier: 0.0.7
+        version: 0.0.7(react@18.3.1)
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -991,28 +988,23 @@ packages:
     resolution: {integrity: sha512-ujeqbceABgwMZxEJnk2HDY2DlnUZ+9oEcb1KzTVfYHio0UE6dG71n60d8D2I4qNvleWrrXpmjpt7vZeF1LnMZQ==}
     engines: {node: '>=6'}
 
-  terminal-electron-native-darwin-arm64@file:../terminal-electron/packages/native/darwin-arm64:
-    resolution: {directory: ../terminal-electron/packages/native/darwin-arm64, type: directory}
+  terminal-electron-native-darwin-arm64@0.0.7:
+    resolution: {integrity: sha512-2uhiUXX8kMxR0EHfvED5w3M8ItqY/I56R3r7ENPqHR4yGyb50B4BT46bkdSOZ3YaBx7xbRCBwsEzNad+3LLkXw==}
     cpu: [arm64]
     os: [darwin]
 
-  terminal-electron-native-darwin-x64@0.0.2:
-    resolution: {integrity: sha512-3LxhlQBmVousvxOiGIH0nS7ggqOYkx8jT7+e6Z7Z45p46/KD2+2inoUu4w9uGFwslGIzz7YTVfR5fZNmUMRHPw==}
+  terminal-electron-native-darwin-x64@0.0.7:
+    resolution: {integrity: sha512-F8St+n29jdA+iFIpPDRPSHOaj+jzUToe9tM27nwYI233BACCmqzveawJMY1KD+DawzdsprkAz3ujK0Q5DT+DUg==}
     cpu: [x64]
     os: [darwin]
 
-  terminal-electron-native-linux-arm64@0.0.2:
-    resolution: {integrity: sha512-TbTlFkn8gzNRKaWF0wE0GmaYcS4AtJosvWAeBGZ6JEpKHIlJTQj5BVohGRfX9mW9sdtO89tza724uuQpF/1ntQ==}
-    cpu: [arm64]
-    os: [linux]
-
-  terminal-electron-native-linux-x64@0.0.2:
-    resolution: {integrity: sha512-BAYOjmqAdJsfTvDHpktuBeaN6BpYjewGgh6lFVwJL0DMc2ZGS1NZ1m02IaSUWqqw9aYgXhsldhoKx+7k2jypcQ==}
+  terminal-electron-native-linux-x64@0.0.7:
+    resolution: {integrity: sha512-zT5oaR0Tn0xnqoprqpXPdhK4bOBsqjMSzQMBGwpCODR9VFmgqf9Ftebvln1rjekNKrOS0HCh1XUjGEPhMmGtcw==}
     cpu: [x64]
     os: [linux]
 
-  terminal-electron@file:../terminal-electron/packages/terminal-electron:
-    resolution: {directory: ../terminal-electron/packages/terminal-electron, type: directory}
+  terminal-electron@0.0.7:
+    resolution: {integrity: sha512-8wO0O11UynDuLgHpFrHKEYsdZbtx31SnPivgGPbfgJGHPmecCLWGk/ZLty88SDoDm60OsZfqmR7daixatkIdOg==}
     hasBin: true
     peerDependencies:
       react: ^18.3.1
@@ -1775,27 +1767,23 @@ snapshots:
       readable-stream: 3.6.2
     optional: true
 
-  terminal-electron-native-darwin-arm64@file:../terminal-electron/packages/native/darwin-arm64:
+  terminal-electron-native-darwin-arm64@0.0.7:
     optional: true
 
-  terminal-electron-native-darwin-x64@0.0.2:
+  terminal-electron-native-darwin-x64@0.0.7:
     optional: true
 
-  terminal-electron-native-linux-arm64@0.0.2:
+  terminal-electron-native-linux-x64@0.0.7:
     optional: true
 
-  terminal-electron-native-linux-x64@0.0.2:
-    optional: true
-
-  terminal-electron@file:../terminal-electron/packages/terminal-electron(react@18.3.1):
+  terminal-electron@0.0.7(react@18.3.1):
     dependencies:
       react: 18.3.1
       react-reconciler: 0.29.2(react@18.3.1)
     optionalDependencies:
-      terminal-electron-native-darwin-arm64: file:../terminal-electron/packages/native/darwin-arm64
-      terminal-electron-native-darwin-x64: 0.0.2
-      terminal-electron-native-linux-arm64: 0.0.2
-      terminal-electron-native-linux-x64: 0.0.2
+      terminal-electron-native-darwin-arm64: 0.0.7
+      terminal-electron-native-darwin-x64: 0.0.7
+      terminal-electron-native-linux-x64: 0.0.7
 
   tinyexec@1.3.0: {}
 

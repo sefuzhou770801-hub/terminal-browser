@@ -1,5 +1,5 @@
 {
-  "name": "terminal-graphics-engine",
+  "name": "terminal-browser",
   "private": true,
   "scripts": {
     "build": "pnpm -r build",
@@ -15,10 +15,5 @@
   "devDependencies": {
     "@electron/osx-sign": "^1.3.3",
     "esbuild": "^0.25.0"
-  },
-  "pnpm": {
-    "overrides": {
-      "terminal-electron-native-darwin-arm64": "file:../terminal-electron/packages/native/darwin-arm64"
-    }
   }
 }
