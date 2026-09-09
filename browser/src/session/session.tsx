@@ -274,6 +274,7 @@ class Session {
       name: "terminal-browser",
       tty: this.ctx.tty,
       sessionEnv: this.ctx.env,
+      cwd: this.ctx.cwd,
       onKey: (event) => this.handleKey(event),
       onResize: () => {
         // really?
@@ -774,7 +775,9 @@ class Session {
       if (this.cmdHeld(event) || event.mods.ctrl) {
         const direction = zoomDirection(event.key);
         if (direction !== null) {
-          this.applyZoom(direction);
+          const shifted = event.mods.shift || event.key === "+" || event.key === "_";
+          if (shifted) this.zoomUi(direction);
+          else this.applyZoom(direction);
           return true;
         }
       }
@@ -784,6 +787,16 @@ class Session {
 
   private applyZoom(direction: ZoomDirection) {
     this.tabs.activeHandle?.zoom(direction);
+  }
+
+  private uiZoom = 1;
+
+  private zoomUi(direction: ZoomDirection) {
+    const step = 1.1;
+    const next = direction === 0 ? 1 : this.uiZoom * (direction > 0 ? step : 1 / step);
+    this.uiZoom = Math.min(3, Math.max(0.5, Number(next.toFixed(3))));
+    this.recalculateLayout();
+    this.render();
   }
 
   private showZoomHud(factor: number) {
@@ -1242,9 +1255,6 @@ class Session {
         shortcut: grabKeyLabel,
         run: () => void this.toggleGrab(),
       },
-      { id: "zoom-in", label: "zoom in", shortcut: "ctrl+=", run: () => this.applyZoom(1) },
-      { id: "zoom-out", label: "zoom out", shortcut: "ctrl+-", run: () => this.applyZoom(-1) },
-      { id: "zoom-reset", label: "reset zoom", shortcut: "ctrl+0", run: () => this.applyZoom(0) },
       {
         id: "devtools",
         label: devtoolsOpen ? "close devtools" : "open devtools",
@@ -1283,11 +1293,12 @@ class Session {
   private recalculateLayout(placement: DevtoolsPlacement | null = this.devtoolsPlacement()) {
     if (!this.root) return;
     const reviewing = this.activeRecord()?.reviewing ?? false;
+    const info = { ...this.root.info, basePx: this.root.info.basePx * this.uiZoom };
     const result = computeLayout(
-      this.root.info,
+      info,
       this.root.displayScale,
       reviewing ? null : placement,
-      reviewing ? recordBarHeight(this.root.info) : 0,
+      reviewing ? recordBarHeight(info) : 0,
     );
     this.layout = result.chrome;
     this.surfaceLayout = result.surface;

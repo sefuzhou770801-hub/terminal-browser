@@ -46,7 +46,7 @@ export function PageContextMenu({
           inset: { top: y, left: x },
           width,
           flexDirection: "column",
-          background: theme.field,
+          background: theme.overlay,
           cornerRadius: rem * 0.45,
           border: { width: 1, color: theme.fieldBorder },
           overflow: "hidden",

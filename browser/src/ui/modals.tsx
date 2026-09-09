@@ -49,7 +49,7 @@ function ModalCard({
           inset: { top: layout.toolbarHeight + layout.rem * 1.2, left: (layout.width - width) / 2 },
           width,
           flexDirection: "column",
-          background: theme.bg,
+          background: theme.overlay,
           cornerRadius: layout.rem * 0.55,
           border: { width: 1, color: theme.fieldBorder },
           overflow: "hidden",

@@ -66,7 +66,7 @@ function TrackTip({
         alignItems: "center",
         justifyContent: "center",
         cornerRadius: rem * 0.3,
-        background: withAlpha(mix(theme.bg, theme.fg, 0.04), 235),
+        background: theme.field,
         border: { width: 1, color: border },
       }}
     >
@@ -193,7 +193,8 @@ export function recordBarCluster(durationMs: number): ClusterContents {
   return { minutes: durationMs >= 60000 };
 }
 
-const PLAY_CLUSTER_REM = 4.7;
+// room for the play pill (icon, gap, "space", padding) plus clear air before the track
+const PLAY_CLUSTER_REM = 5.4;
 
 export function recordBarMetrics(layout: ChromeLayout, cluster: ClusterContents): RecordBarMetrics {
   const rem = layout.rem;
@@ -243,7 +244,6 @@ export function RecordBar({
         inset: { top: metrics.y, left: 0 },
         width: layout.width,
         height: metrics.height,
-        background: theme.bg,
       }}
     >
       <Box
@@ -443,7 +443,7 @@ function ShotThumb({
           <Text
             style={{
               fontSize: rem * 0.55,
-              color: theme.bg,
+              color: theme.overlay,
               wrap: false,
               selectable: false,
             }}
@@ -546,7 +546,7 @@ function Track({
           height: strip.height,
           cornerRadius: 6,
           overflow: "hidden",
-          background: mix(theme.bg, [0, 0, 0, 255], 0.35),
+          background: withAlpha([0, 0, 0, 255], 89),
           border: { width: 1, color: theme.fieldBorder },
         }}
       >
@@ -736,7 +736,7 @@ function Track({
                 : mix(theme.fg, theme.bg, 0.08),
             border: {
               width: 1,
-              color: view.onShot ? theme.accent : withAlpha(theme.bg, 200),
+              color: view.onShot ? theme.accent : withAlpha(theme.overlay, 200),
             },
           }}
         />
@@ -758,7 +758,7 @@ function Track({
               alignItems: "center",
               padding: { left: rem * 0.35, right: rem * 0.35 },
               cornerRadius: rem * 0.3,
-              background: withAlpha(mix(theme.bg, theme.fg, 0.04), 235),
+              background: theme.field,
               border: { width: 1, color: theme.fieldBorder },
             }}
           >

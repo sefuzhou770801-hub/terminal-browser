@@ -35,7 +35,7 @@ export function FindBar({
         alignItems: "center",
         gap: rem * 0.2,
         padding: { left: rem * 0.6, right: rem * 0.3 },
-        background: theme.bg,
+        background: theme.overlay,
         cornerRadius: rem * 0.5,
         border: { width: 1, color: theme.fieldBorder },
       }}
@@ -114,7 +114,7 @@ export function DownloadHud({
         alignItems: "center",
         gap: rem * 0.5,
         padding: { left: rem * 0.8, right: rem * 0.8 },
-        background: theme.bg,
+        background: theme.overlay,
         cornerRadius: rem * 0.5,
         border: { width: 1, color: theme.fieldBorder },
       }}
@@ -149,9 +149,9 @@ export function Toast({
         gap: rem * 0.25,
         height: detailLines.length > 0 ? rem * (2.3 + detailLines.length * 1.05) : rem * 2,
         padding: { left: rem * 0.9, right: rem * 0.9 },
-        background: toast.alert ? mix(theme.bg, theme.red, 0.22) : theme.bg,
+        background: toast.alert ? mix(theme.overlay, theme.red, 0.22) : theme.overlay,
         cornerRadius: rem * 0.5,
-        border: { width: 1, color: toast.alert ? mix(theme.bg, theme.red, 0.5) : theme.fieldBorder },
+        border: { width: 1, color: toast.alert ? mix(theme.overlay, theme.red, 0.5) : theme.fieldBorder },
       }}
     >
       <Text
@@ -204,7 +204,7 @@ export function ZoomHud({
         height: rem * 2,
         alignItems: "center",
         padding: { left: rem * 0.8, right: rem * 0.8 },
-        background: theme.bg,
+        background: theme.overlay,
         cornerRadius: rem * 0.5,
         border: { width: 1, color: theme.fieldBorder },
       }}

@@ -16,7 +16,7 @@ import type { MarkupCanvasView } from "../record/types";
 import { ICONS, Icon } from "./icons";
 import type { IconName } from "./icons";
 import { PopupMenu, ShadeAround } from "./record-widgets";
-import { mix, withAlpha } from "./theme";
+import { withAlpha } from "./theme";
 import type { Theme } from "./theme";
 import type { ChromeActions, ChromeLayout } from "./types";
 
@@ -83,7 +83,6 @@ export function MarkupCanvas({
         width: view.rect.width,
         height: view.rect.height,
         overflow: "hidden",
-        background: theme.bg,
       }}
       onDrag={actions.record.canvasDrag}
       onWheel={actions.record.canvasWheel}
@@ -650,7 +649,7 @@ function Toolbar({
         alignItems: "center",
         gap: rem * 0.12,
         padding: { left: rem * 0.3, right: rem * 0.15 },
-        background: mix(theme.bg, [0, 0, 0, 255], 0.25),
+        background: theme.overlay,
         cornerRadius: rem * 0.45,
         border: { width: 1, color: theme.fieldBorder },
       }}

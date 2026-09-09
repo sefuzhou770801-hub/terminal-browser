@@ -34,7 +34,7 @@ fi
 LIB="$(cd "$LIB" && pwd)"
 [ -f "$LIB/packages/terminal-electron/package.json" ] || { echo "no terminal-electron checkout at $LIB (set TERMINAL_ELECTRON_DIR)" >&2; exit 1; }
 
-(cd "$LIB" && pnpm --filter terminal-electron build && pnpm --filter terminal-electron build:native)
+(cd "$LIB" && pnpm --filter terminal-electron build && pnpm --filter terminal-electron build:native -- --release)
 
 # file: copies the package into node_modules, so its imports of react and electron
 # resolve here rather than in the library repo (a symlink would give two Reacts).

@@ -447,7 +447,7 @@ function BrowserTabContents({
           width: layout.page.width + 2,
           height: layout.page.height + 2,
           cornerRadius: seamRadius(layout.rem * 0.55, dock, "page"),
-          border: { width: 1, color: agentActive ? theme.accent : theme.fieldBorder },
+          border: { width: 1, color: agentActive ? theme.accent : theme.frame },
         }}
       />
       {tabs.map((tab) => (
@@ -518,7 +518,7 @@ function DevtoolsPane({
           width: rect.width + 2,
           height: rect.height + 2,
           cornerRadius: seamRadius(layout.rem * 0.55, rect.dock, "devtools"),
-          border: { width: 1, color: theme.fieldBorder },
+          border: { width: 1, color: theme.frame },
         }}
       />
       {target && (
