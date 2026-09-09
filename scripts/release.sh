@@ -36,7 +36,9 @@ AGENT_BROWSER_BIN="$("$ROOT/scripts/agent-browser.sh" --path)"
 cp "$AGENT_BROWSER_BIN" "$STAGE/agent-browser/bin/agent-browser"
 
 "$ROOT/scripts/bundle.sh" "$ROOT/cli/src/main.ts" "$STAGE/cli/dist/main.js"
+cp "$ROOT/terminals/src/terminals/ghostty.jxa" "$STAGE/cli/dist/"
 "$ROOT/scripts/bundle.sh" "$ROOT/browser/src/main.tsx" "$STAGE/browser/dist/main.js"
+cp "$ROOT/terminals/src/terminals/ghostty.jxa" "$STAGE/browser/dist/"
 
 cp "$ROOT/scripts/apparmor.sh" "$STAGE/scripts/apparmor.sh"
 

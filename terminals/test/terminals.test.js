@@ -214,3 +214,92 @@ test("herdr prepare stays silent when herdr itself cannot be run", async () => {
   assert.deepEqual(warnings, []);
 });
 
+
+const GHOSTTY_ENV = {
+  TERM: "xterm-ghostty",
+  TERM_PROGRAM: "ghostty",
+  TERM_PROGRAM_VERSION: "1.3.1",
+  GHOSTTY_RESOURCES_DIR: "/Applications/Ghostty.app/Contents/Resources/ghostty",
+};
+const GHOSTTY_BIN = "/Applications/Ghostty.app/Contents/MacOS/ghostty";
+const processTable = (rows) => rows.map((row) => row.join(" ")).join("\n") + "\n";
+
+// a test process lives under whatever launched node, so the pretend ghostty is grafted
+// in as our own parent to get a shell -> ghostty ancestry without knowing the real tree
+test("ghostty scripts the instance this shell runs inside, not the newest one", async () => {
+  const { run, commands } = recorder({
+    "ps -axo pid=,ppid=,tty=,command=": processTable([
+      [process.pid, process.ppid, "ttys001", "node test"],
+      [process.ppid, 1, "??", GHOSTTY_BIN],
+      [9001, 1, "??", `${GHOSTTY_BIN} -e sh -c python3 probe.py`],
+    ]),
+    [`osascript -l JavaScript - ${process.ppid} list`]: "w1\tt1\tAAAA\t\t\t/Users/me\n",
+    "ps -e -o pid=,tty=,args=": "",
+  });
+  const terminal = detect(GHOSTTY_ENV, run);
+  assert.deepEqual(await terminal.listPanes(), [
+    { id: "AAAA", tab: "w1:t1", tty: null, command: null },
+  ]);
+  assert.ok(commands.includes(`osascript -l JavaScript - ${process.ppid} list`));
+});
+
+test("ghostty falls back to the only instance when this shell is not inside one", async () => {
+  const { run, commands } = recorder({
+    "ps -axo pid=,ppid=,tty=,command=": processTable([
+      [process.pid, 1, "ttys001", "node test"],
+      [7000, 1, "??", GHOSTTY_BIN],
+    ]),
+    "osascript -l JavaScript - 7000 list": "w1\tt1\tAAAA\t\t\t/Users/me\n",
+    "ps -e -o pid=,tty=,args=": "",
+  });
+  await detect(GHOSTTY_ENV, run).listPanes();
+  assert.ok(commands.includes("osascript -l JavaScript - 7000 list"));
+});
+
+test("ghostty finds the instance through the caller tty when ancestry does not reach one", async () => {
+  const { run, commands } = recorder({
+    "ps -axo pid=,ppid=,tty=,command=": processTable([
+      [process.pid, 1, "??", "node daemon"],
+      [7000, 1, "??", GHOSTTY_BIN],
+      [7001, 7000, "ttys009", "login"],
+      [7002, 7001, "ttys009", "-zsh"],
+      [8000, 1, "??", `${GHOSTTY_BIN} -e probe`],
+    ]),
+    "osascript -l JavaScript - 7000 list": "w1\tt1\tAAAA\t\t/dev/ttys009\t/Users/me\n",
+  });
+  const pane = await detect(GHOSTTY_ENV, run).getCurrentPane({ tty: "/dev/ttys009", cwd: "/" });
+  assert.deepEqual(pane, { id: "AAAA", tab: "w1:t1", tty: "/dev/ttys009", command: null });
+  assert.ok(commands.includes("osascript -l JavaScript - 7000 list"));
+});
+
+test("ghostty refuses to guess between instances it cannot connect to this shell", async () => {
+  const { run } = recorder({
+    "ps -axo pid=,ppid=,tty=,command=": processTable([
+      [process.pid, 1, "ttys001", "node test"],
+      [7000, 1, "??", GHOSTTY_BIN],
+      [8000, 1, "??", `${GHOSTTY_BIN} -e probe`],
+    ]),
+  });
+  await assert.rejects(detect(GHOSTTY_ENV, run).listPanes(), /2 Ghostty processes.*7000, 8000/);
+});
+
+test("ghostty splits through the owning instance with the direction code", async () => {
+  const { run, commands } = recorder({
+    "ps -axo pid=,ppid=,tty=,command=": processTable([
+      [process.pid, process.ppid, "ttys001", "node test"],
+      [process.ppid, 1, "??", GHOSTTY_BIN],
+    ]),
+    [`osascript -l JavaScript - ${process.ppid} split AAAA GSrt ${process.cwd()} terminal-browser open\n`]: "BBBB",
+  });
+  await detect(GHOSTTY_ENV, run).split({
+    from: { id: "AAAA", tab: "w1:t1" },
+    direction: "right",
+    command: ["terminal-browser", "open"],
+    size: null,
+    tty: null,
+  });
+  assert.deepEqual(commands, [
+    "ps -axo pid=,ppid=,tty=,command=",
+    `osascript -l JavaScript - ${process.ppid} split AAAA GSrt ${process.cwd()} terminal-browser open\n`,
+  ]);
+});

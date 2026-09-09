@@ -1,0 +1,139 @@
+ObjC.import("Foundation");
+
+const Descriptor = $.NSAppleEventDescriptor;
+const WAIT_FOR_REPLY = 3;
+const NOT_FOUND = -1728;
+
+function code(text) {
+  return ((text.charCodeAt(0) << 24) | (text.charCodeAt(1) << 16) | (text.charCodeAt(2) << 8) | text.charCodeAt(3)) >>> 0;
+}
+const typeCode = (text) => Descriptor.descriptorWithTypeCode(code(text));
+const enumCode = (text) => Descriptor.descriptorWithEnumCode(code(text));
+const string = (text) => Descriptor.descriptorWithString(text);
+const nothing = Descriptor.nullDescriptor;
+// the "every element" ordinal is the four-char code 'all ' stored in native (little-endian) byte order
+const everyOrdinal = Descriptor.descriptorWithDescriptorTypeData(
+  code("abso"),
+  $(" lla").dataUsingEncoding($.NSMacOSRomanStringEncoding),
+);
+
+function specifier(wanted, container, form, key) {
+  const record = Descriptor.recordDescriptor;
+  record.setDescriptorForKeyword(typeCode(wanted), code("want"));
+  record.setDescriptorForKeyword(container, code("from"));
+  record.setDescriptorForKeyword(enumCode(form), code("form"));
+  record.setDescriptorForKeyword(key, code("seld"));
+  return record.coerceToDescriptorType(code("obj "));
+}
+const every = (cls, container) => specifier(cls, container, "indx", everyOrdinal);
+const property = (name, of) => specifier("prop", of, "prop", typeCode(name));
+const terminal = (id) => specifier("Gtrm", nothing, "ID  ", string(id));
+
+function unwrap(descriptor) {
+  if (descriptor.isNil()) return null;
+  if (descriptor.descriptorType === code("list")) {
+    const items = [];
+    for (let i = 1; i <= descriptor.numberOfItems; i++) items.push(unwrap(descriptor.descriptorAtIndex(i)));
+    return items;
+  }
+  const text = descriptor.stringValue;
+  return text.isNil() ? null : ObjC.unwrap(text);
+}
+
+function send(pid, eventClass, eventId, params) {
+  const event = Descriptor.appleEventWithEventClassEventIDTargetDescriptorReturnIDTransactionID(
+    code(eventClass),
+    code(eventId),
+    Descriptor.descriptorWithProcessIdentifier(pid),
+    -1,
+    0,
+  );
+  for (const keyword of Object.keys(params)) event.setParamDescriptorForKeyword(params[keyword], code(keyword));
+  const failure = Ref();
+  const reply = event.sendEventWithOptionsTimeoutError(WAIT_FOR_REPLY, 10, failure);
+  if (reply.isNil()) {
+    throw new Error("[placeholder copy: Ghostty (pid " + pid + ") did not answer: " + ObjC.unwrap(failure[0].localizedDescription) + "]");
+  }
+  const number = reply.paramDescriptorForKeyword(code("errn"));
+  if (!number.isNil()) {
+    const message = reply.paramDescriptorForKeyword(code("errs"));
+    const detail = message.isNil() ? "" : ": " + ObjC.unwrap(message.stringValue);
+    const error = new Error("[placeholder copy: Ghostty (pid " + pid + ") refused the request (" + number.int32Value + ")" + detail + "]");
+    error.code = number.int32Value;
+    throw error;
+  }
+  return reply.paramDescriptorForKeyword(code("----"));
+}
+
+const get = (pid, name, of) => unwrap(send(pid, "core", "getd", { "----": property(name, of) }));
+
+function list(pid) {
+  const windows = every("Gwnd", nothing);
+  const tabs = every("Gtab", windows);
+  const terminals = every("Gtrm", tabs);
+  const optional = (name) => {
+    try {
+      return get(pid, name, terminals);
+    } catch (error) {
+      if (error.code === NOT_FOUND) return null;
+      throw error;
+    }
+  };
+  const windowIds = get(pid, "ID  ", windows);
+  const tabIds = get(pid, "ID  ", tabs);
+  const ids = get(pid, "ID  ", terminals);
+  const cwds = get(pid, "Gwdr", terminals);
+  const foregroundPids = optional("Gpid");
+  const ttys = optional("Gtty");
+  let out = "";
+  windowIds.forEach((windowId, w) => {
+    tabIds[w].forEach((tabId, t) => {
+      ids[w][t].forEach((id, i) => {
+        const foreground = foregroundPids ? foregroundPids[w][t][i] : "";
+        const tty = ttys ? ttys[w][t][i] : "";
+        out += [windowId, tabId, id, foreground ?? "", tty ?? "", cwds[w][t][i] ?? ""].join("\t") + "\n";
+      });
+    });
+  });
+  return out;
+}
+
+function orNotFound(work) {
+  try {
+    return work();
+  } catch (error) {
+    if (error.code === NOT_FOUND) return "not-found";
+    throw error;
+  }
+}
+
+function run(argv) {
+  const [pid, command, ...rest] = argv;
+  const target = Number(pid);
+  switch (command) {
+    case "list":
+      return list(target);
+    case "split":
+      return orNotFound(() => {
+        const [id, direction, directory, input] = rest;
+        const configuration = Descriptor.recordDescriptor;
+        configuration.setDescriptorForKeyword(string(directory), code("GScD"));
+        configuration.setDescriptorForKeyword(string(input), code("GScI"));
+        const opened = send(target, "Ghst", "Splt", { "----": terminal(id), GSpd: enumCode(direction), GSpS: configuration });
+        return get(target, "ID  ", opened);
+      });
+    case "input":
+      return orNotFound(() => {
+        send(target, "Ghst", "InTx", { "----": string(rest[1]), GItT: terminal(rest[0]) });
+        return "ok";
+      });
+    case "focus":
+      return orNotFound(() => {
+        send(target, "Ghst", "Fcus", { "----": terminal(rest[0]) });
+        return "ok";
+      });
+    case "action":
+      return orNotFound(() => unwrap(send(target, "Ghst", "PfAc", { "----": string(rest[1]), GonT: terminal(rest[0]) })));
+  }
+  throw new Error("unknown command " + command);
+}

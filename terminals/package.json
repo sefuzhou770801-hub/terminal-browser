@@ -5,9 +5,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && cp src/terminals/ghostty.jxa dist/terminals/",
     "typecheck": "tsc --noEmit",
-    "test": "tsc -p tsconfig.json && node --test \"test/*.test.js\""
+    "test": "npm run build && node --test \"test/*.test.js\""
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
