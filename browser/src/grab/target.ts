@@ -113,7 +113,10 @@ export class AgentPaneFinder {
     let panes: PaneDetails[] = [];
     try {
       panes = await withCommands(
-        (await terminal.listPanes?.({ commands: (command) => codingAgent(command) != null })) ?? [],
+        (await terminal.listPanes?.({
+          commands: (command) => codingAgent(command) != null,
+          tty: this.ctx.parentTty,
+        })) ?? [],
       );
     } catch {}
     const self = await this.ctx.self();
