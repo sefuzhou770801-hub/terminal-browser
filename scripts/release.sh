@@ -72,11 +72,24 @@ if [ -n "$DARWIN_ARCH" ]; then
     "$APP/Contents/Info.plist" >/dev/null
   ELECTRON_EXE="electron/terminal-browser.app/Contents/MacOS/terminal-browser"
   NATIVE_SCROLL='export NATIVE_SCROLL_HELPER="${NATIVE_SCROLL_HELPER:-$ROOT/bin/native-scroll-helper}"'
+  FUSE_TARGET="$APP"
 else
   cp -a "$ELECTRON_DIST/." "$STAGE/electron/"
   ELECTRON_EXE="electron/electron"
   NATIVE_SCROLL=""
+  FUSE_TARGET="$STAGE/electron/electron"
 fi
+
+TOOLS="$OUT/tools"
+mkdir -p "$TOOLS"
+[ -f "$TOOLS/package.json" ] || echo '{"private":true}' > "$TOOLS/package.json"
+(cd "$TOOLS" && npm install --no-audit --no-fund --silent @electron/fuses@2.1.3)
+FUSES="$TOOLS/node_modules/.bin/electron-fuses"
+[ -x "$FUSES" ] || { echo "release.sh: @electron/fuses did not install" >&2; exit 1; }
+NO_COLOR=1 "$FUSES" write --app "$FUSE_TARGET" EnableCookieEncryption=on
+NO_COLOR=1 "$FUSES" read --app "$FUSE_TARGET" | sed $'s/\x1b\[[0-9;]*m//g' | tee "$OUT/fuses.txt"
+grep -q "EnableCookieEncryption is Enabled" "$OUT/fuses.txt"
+grep -q "RunAsNode is Enabled" "$OUT/fuses.txt"
 
 cat > "$STAGE/bin/terminal-browser" <<EOF
 #!/bin/sh
