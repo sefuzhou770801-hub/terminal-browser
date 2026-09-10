@@ -27,8 +27,8 @@ importers:
         specifier: 0.2.0
         version: 0.2.0(react@18.3.1)
       terminal-electron:
-        specifier: 0.0.8
-        version: 0.0.8(react@18.3.1)
+        specifier: 0.0.10
+        version: 0.0.10(react@18.3.1)
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -46,8 +46,8 @@ importers:
         specifier: workspace:*
         version: link:../store
       terminal-electron:
-        specifier: 0.0.8
-        version: 0.0.8(react@18.3.1)
+        specifier: 0.0.10
+        version: 0.0.10(react@18.3.1)
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -986,28 +986,28 @@ packages:
     resolution: {integrity: sha512-ujeqbceABgwMZxEJnk2HDY2DlnUZ+9oEcb1KzTVfYHio0UE6dG71n60d8D2I4qNvleWrrXpmjpt7vZeF1LnMZQ==}
     engines: {node: '>=6'}
 
-  terminal-electron-native-darwin-arm64@0.0.8:
-    resolution: {integrity: sha512-hBlkTwNZaYSyQAQmjvSBkCxUKUf8din/YISwrwBu9MJgbIrLEq+bXz21owoQx7zLLhOq184FztGHz568M/9X+g==}
+  terminal-electron-native-darwin-arm64@0.0.10:
+    resolution: {integrity: sha512-Q+P+POGBaH/48DTf+wfvUxJiyVEXjFwu2WwX45gVjlATNOxumn/IvRMS9mUuooYImhfFgyDLRc8rt2iwB9OtoQ==}
     cpu: [arm64]
     os: [darwin]
 
-  terminal-electron-native-darwin-x64@0.0.8:
-    resolution: {integrity: sha512-+wnNsehKlypldLmrDYMS48i1KKuha0AyGOF0pobUa/xxGtk/qf4kI3TXFPY8gnjiEQKLGiyLloWuE96i3fRNiQ==}
+  terminal-electron-native-darwin-x64@0.0.10:
+    resolution: {integrity: sha512-CbjPG+OFZ0So86WH+EKzLKDGJWd+LU1ChNRLRYn8iMvcWPAuhkXzwZWTkyWHJ6u07VPWupfQwyCrdrAB4I/W3A==}
     cpu: [x64]
     os: [darwin]
 
-  terminal-electron-native-linux-arm64@0.0.8:
-    resolution: {integrity: sha512-7vUgUqQa4Y6arWTB11T2rh+LM4U/Z0Qf4Xm2VgNxWNs8AvWHdN/8pE6MDmX6BE3soYdTkU/ou361f8rt9cUi9g==}
+  terminal-electron-native-linux-arm64@0.0.10:
+    resolution: {integrity: sha512-ptTBbDcjMVp29WrHYElWOsO9flnEVRBwE5ZokJqNwERdOoKMdnY5ulz/+77m50yPBJKAehoCBXA1LceteHZCbQ==}
     cpu: [arm64]
     os: [linux]
 
-  terminal-electron-native-linux-x64@0.0.8:
-    resolution: {integrity: sha512-qHyg1TxLJCA8IeKz6QDb/tNSNWBi7xPz0zNcFGrHSw60gJf0Oe9RE6Dos+LBFsuZ6s20AV5rd/E+f3qBkxKpwQ==}
+  terminal-electron-native-linux-x64@0.0.10:
+    resolution: {integrity: sha512-HujWgqqDB9z2NiuuykHspdRTauESY/rgKa247qt+fMe9pvq7CuPI0SIGpPHDYnpwVmyLVcMEVhFEPfC/vYmucg==}
     cpu: [x64]
     os: [linux]
 
-  terminal-electron@0.0.8:
-    resolution: {integrity: sha512-VvsJ17HRNG922ofZEqPNQRPYgyPMxGHxLGZZtcHzR71/r6FHS5KstCzl4uWE8lWHA8Lfw9Ekks+prWlR0ow6mw==}
+  terminal-electron@0.0.10:
+    resolution: {integrity: sha512-53sGe05TORok8y53i+zofGTmTx9Ux/+4JyA0Xmdh5Zl474xm3PhhWo1+/I+dVVqZ1sql+Bpaa8PN2U/2r7zujA==}
     hasBin: true
     peerDependencies:
       react: ^18.3.1
@@ -1770,27 +1770,27 @@ snapshots:
       readable-stream: 3.6.2
     optional: true
 
-  terminal-electron-native-darwin-arm64@0.0.8:
+  terminal-electron-native-darwin-arm64@0.0.10:
     optional: true
 
-  terminal-electron-native-darwin-x64@0.0.8:
+  terminal-electron-native-darwin-x64@0.0.10:
     optional: true
 
-  terminal-electron-native-linux-arm64@0.0.8:
+  terminal-electron-native-linux-arm64@0.0.10:
     optional: true
 
-  terminal-electron-native-linux-x64@0.0.8:
+  terminal-electron-native-linux-x64@0.0.10:
     optional: true
 
-  terminal-electron@0.0.8(react@18.3.1):
+  terminal-electron@0.0.10(react@18.3.1):
     dependencies:
       react: 18.3.1
       react-reconciler: 0.29.2(react@18.3.1)
     optionalDependencies:
-      terminal-electron-native-darwin-arm64: 0.0.8
-      terminal-electron-native-darwin-x64: 0.0.8
-      terminal-electron-native-linux-arm64: 0.0.8
-      terminal-electron-native-linux-x64: 0.0.8
+      terminal-electron-native-darwin-arm64: 0.0.10
+      terminal-electron-native-darwin-x64: 0.0.10
+      terminal-electron-native-linux-arm64: 0.0.10
+      terminal-electron-native-linux-x64: 0.0.10
 
   tinyexec@1.3.0: {}
 
