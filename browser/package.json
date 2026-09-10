@@ -14,7 +14,7 @@
     "pixel-store": "workspace:*",
     "react": "^18.3.1",
     "react-grab": "0.2.0",
-    "terminal-electron": "0.0.7"
+    "terminal-electron": "file:../../terminal-electron/packages/terminal-electron"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

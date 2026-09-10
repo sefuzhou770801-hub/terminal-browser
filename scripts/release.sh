@@ -60,6 +60,16 @@ if [ ! -f "$ELECTRON_DIST/.zenbu-electron-sha256" ]; then
   echo "refusing to build: terminal-electron has not installed its patched electron (run pnpm install)" >&2
   exit 1
 fi
+FRAMEWORK_BINARY="$ELECTRON_DIST/Electron.app/Contents/Frameworks/Electron Framework.framework/Electron Framework"
+if [ -n "$DARWIN_ARCH" ] && [ -e "$FRAMEWORK_BINARY" ] && [ ! -L "$FRAMEWORK_BINARY" ]; then
+  echo "electron bundle lost its symlinks; re-extracting" >&2
+  rm -rf "$ELECTRON_DIST"
+  node "$(dirname "$ELECTRON_DIST")/../scripts/postinstall.mjs"
+  if [ ! -L "$FRAMEWORK_BINARY" ]; then
+    echo "refusing to build: electron framework is still not a proper bundle after re-extraction" >&2
+    exit 1
+  fi
+fi
 if [ -n "$DARWIN_ARCH" ]; then
   APP="$STAGE/electron/terminal-browser.app"
   ditto "$ELECTRON_DIST/Electron.app" "$APP"
