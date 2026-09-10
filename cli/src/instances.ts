@@ -1,7 +1,7 @@
 import { callerTty } from "terminal-electron/terminal";
 import type { Direction, Pane, Terminal } from "terminal-electron/terminal";
 
-import { control } from "./control";
+import { control, WHERE_TIMEOUT_MS } from "./control";
 import { instances } from "./registry";
 import type { InstanceRecord } from "./registry";
 
@@ -34,7 +34,7 @@ export interface Where {
 export async function asked(records: InstanceRecord[]): Promise<Map<string, Where>> {
   const answers = await Promise.all(
     records.map(async (record) => {
-      const where = await control(record.socket, { cmd: "where" }, 2000).catch(() => null);
+      const where = await control(record.socket, { cmd: "where" }, WHERE_TIMEOUT_MS).catch(() => null);
       return [recordKey(record), where as Where | null] as const;
     }),
   );

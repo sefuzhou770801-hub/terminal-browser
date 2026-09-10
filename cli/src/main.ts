@@ -427,7 +427,7 @@ async function launchInSplit(
     if (fresh) {
       return fresh;
     }
-    await sleep(250);
+    await sleep(50);
   }
   fail(`browser did not register within ${Math.round(patience / 1000)}s (is the split open?)`);
 }

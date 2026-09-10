@@ -3,7 +3,7 @@ import type { Terminal } from "terminal-electron/terminal";
 import { INTEROP_PROTOCOL_VERSIONS, listInteropInstances } from "pixel-store";
 import type { InteropInstance, OpenSpec } from "pixel-store";
 
-import { control } from "./control";
+import { control, WHERE_TIMEOUT_MS } from "./control";
 
 export type Host = InteropInstance & { pane: string | null };
 
@@ -22,7 +22,7 @@ export async function findHosts(terminal: Terminal | null): Promise<Host[]> {
   if (!current) return [];
   const answers = await Promise.all(
     records.map(async (record) => {
-      const where = (await control(record.socket, { cmd: "where" }, 2000).catch(() => null)) as {
+      const where = (await control(record.socket, { cmd: "where" }, WHERE_TIMEOUT_MS).catch(() => null)) as {
         terminal: string | null;
         tab: string | null;
         pane: string | null;
