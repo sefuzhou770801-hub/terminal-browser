@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "pixel-store": "workspace:*",
-    "terminal-electron": "file:../../terminal-electron/packages/terminal-electron"
+    "terminal-electron": "0.0.8"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
