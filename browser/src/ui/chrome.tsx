@@ -443,16 +443,18 @@ function BrowserTabContents({
   const dock = layout.devtools?.dock ?? null;
   return (
     <>
-      <Box
-        style={{
-          position: "absolute",
-          inset: { top: layout.page.y - 1, left: layout.page.x - 1 },
-          width: layout.page.width + 2,
-          height: layout.page.height + 2,
-          cornerRadius: seamRadius(layout.rem * 0.55, dock, "page"),
-          border: { width: 1, color: agentActive ? theme.accent : theme.frame },
-        }}
-      />
+      {!coveredByReview && (
+        <Box
+          style={{
+            position: "absolute",
+            inset: { top: layout.page.y - 1, left: layout.page.x - 1 },
+            width: layout.page.width + 2,
+            height: layout.page.height + 2,
+            cornerRadius: seamRadius(layout.rem * 0.55, dock, "page"),
+            border: { width: 1, color: agentActive ? theme.accent : theme.frame },
+          }}
+        />
+      )}
       {tabs.map((tab) => (
         <WebView
           key={tab.id}
