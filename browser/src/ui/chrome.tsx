@@ -110,6 +110,7 @@ export function Chrome({
         tabs={tabViews}
         tabActions={tabActions}
         agentActive={agentActive}
+        coveredByReview={record?.canvas != null}
       />
       {agentActive && <AgentGlow layout={layout} theme={theme} intensity={glowPulse} />}
       {layout.devtools && devtools && (
@@ -430,12 +431,14 @@ function BrowserTabContents({
   tabs,
   tabActions,
   agentActive,
+  coveredByReview,
 }: {
   layout: ChromeLayout;
   theme: Theme;
   tabs: TabView[];
   tabActions: TabActions;
   agentActive: boolean;
+  coveredByReview: boolean;
 }) {
   const dock = layout.devtools?.dock ?? null;
   return (
@@ -455,7 +458,7 @@ function BrowserTabContents({
           key={tab.id}
           ref={tab.ref}
           src={tab.url}
-          hidden={!tab.active}
+          hidden={!tab.active || coveredByReview}
           autoFocus={tab.active}
           devtools={false}
           partition={tab.partition ?? undefined}
