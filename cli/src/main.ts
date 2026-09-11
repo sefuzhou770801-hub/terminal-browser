@@ -35,7 +35,7 @@ import { findHosts, openInHost } from "./interop";
 import { lsCommand } from "./ls";
 import { instances } from "./registry";
 import { apparmorSetup, deniedRefusal, linuxSandboxError, sandboxRefusal } from "./sandbox";
-import { connectSsh, validateBundleDir, validateSshTarget } from "terminal-electron/ssh";
+import { connectSsh, validateSshTarget } from "terminal-electron/ssh";
 import type { InstanceRecord } from "./registry";
 import { installedVersion, upgradeCommand } from "./upgrade";
 
@@ -365,14 +365,8 @@ async function sshSetup(argv: string[]): Promise<void> {
   const interrupt = () => process.exit(130);
   const signals = ["SIGINT", "SIGTERM", "SIGHUP"] as const;
   for (const signal of signals) process.on(signal, interrupt);
-  const session = await connectSsh({
-    target,
-    bundle: flagEq(argv, "--ssh-bundle") || undefined,
-    remoteBase: flagEq(argv, "--ssh-bundle-dir") || undefined,
-    status: (line) => process.stdout.write(`ssh: ${line}\n`),
-  });
+  const session = await connectSsh({ target, status: (line) => process.stdout.write(`ssh: ${line}\n`) });
   argv.push(`--socks-port=${session.socksPort}`);
-  if (session.url && !argv.some((arg) => !arg.startsWith("-"))) argv.unshift(session.url);
   for (const signal of signals) process.removeListener(signal, interrupt);
 }
 
@@ -419,7 +413,7 @@ async function launchInSplit(
     size: size ?? null,
     tty: ownTtyPath() ?? callerTty().path,
   });
-  // ssh auth prompts and bundle installs run inside the new pane first
+  // ssh auth prompts run inside the new pane first
   const patience = argv.some((arg) => arg.startsWith("--ssh=")) ? 600_000 : 20_000;
   const deadline = Date.now() + patience;
   while (Date.now() < deadline) {
@@ -478,8 +472,6 @@ async function requireGraphics(check: TerminalCheck) {
 const BROWSER_FLAGS = [
   "--allow-clipboard-read",
   "--ssh=",
-  "--ssh-bundle=",
-  "--ssh-bundle-dir=",
   "--palette-key=",
   "--find-key=",
   "--devtools-key=",
@@ -519,24 +511,16 @@ function rejectUnknownFlags(args: string[]) {
 }
 
 function takeSshFlags(args: string[]): void {
+  if (args.some((arg) => /^--ssh-bundle(-dir)?(=|$)/.test(arg))) {
+    fail(
+      "[placeholder copy: --ssh-bundle and --ssh-bundle-dir are no longer part of terminal-browser. Remote apps are built with terminal-electron, whose ssh support (terminal-electron/ssh) installs and starts a bundle on the server.]",
+    );
+  }
   const ssh = takeFlag(args, "--ssh");
   if (ssh !== undefined) args.push(`--ssh=${ssh}`);
-  const bundle = takeFlag(args, "--ssh-bundle");
-  if (bundle !== undefined) args.push(`--ssh-bundle=${bundle}`);
-  const bundleDir = takeFlag(args, "--ssh-bundle-dir");
-  if (bundleDir !== undefined) args.push(`--ssh-bundle-dir=${bundleDir}`);
-  const at = args.findIndex((arg) => arg.startsWith("--ssh-bundle="));
-  if (at >= 0) {
-    args[at] = `--ssh-bundle=${path.resolve(args[at].slice("--ssh-bundle=".length))}`;
-  }
   const target = args.find((arg) => arg.startsWith("--ssh="))?.slice("--ssh=".length);
-  if (at >= 0 && !target) fail("--ssh-bundle needs --ssh");
-  if (args.some((arg) => arg.startsWith("--ssh-bundle-dir=")) && at < 0) {
-    fail("--ssh-bundle-dir needs --ssh-bundle");
-  }
   try {
     if (target) validateSshTarget(target);
-    if (at >= 0) validateBundleDir(args[at].slice("--ssh-bundle=".length));
   } catch (error) {
     fail(error instanceof Error ? error.message : String(error));
   }

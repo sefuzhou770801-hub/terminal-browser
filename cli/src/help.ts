@@ -20,12 +20,6 @@ Options:
   --size <fraction>     How much of the space the split takes (0.2 to 0.95)
   --ssh <user@host>     Perform all network requests through a remote server, then
                         proxy the result back to the local terminal-browser instance
-  --ssh-bundle <dir>    Install and execute a bundle on a remote server. This is useful when paired with
-                        --ssh, allowing you to run an application server on a
-                        remote machine, then view the output over ssh
-  --ssh-bundle-dir <dir>
-                        The path --ssh-bundle should be installed to through the ssh server. Defaults to
-                        \${XDG_DATA_HOME:-~/.local/share}/terminal-electron/bundles
   --allow-clipboard-read
                         Lets websites read from clipboard.
   --no-merge            Do not open the terminal-browser instance as a tab in a neighbor terminal-browser
