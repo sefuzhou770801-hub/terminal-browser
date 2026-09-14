@@ -14,7 +14,7 @@
     "pixel-store": "workspace:*",
     "react": "^18.3.1",
     "react-grab": "0.2.0",
-    "@zenbu-labs/pixel": "0.0.12"
+    "@zenbu-labs/pixel": "0.0.13"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

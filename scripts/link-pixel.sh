@@ -16,7 +16,7 @@ if [ "${1:-}" = "--unlink" ]; then
     const fs = require("fs");
     for (const file of ["browser/package.json", "cli/package.json"]) {
       const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
-      pkg.dependencies["@zenbu-labs/pixel"] = "0.0.12";
+      pkg.dependencies["@zenbu-labs/pixel"] = "0.0.13";
       fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
     }
     const root = JSON.parse(fs.readFileSync("package.json", "utf8"));
