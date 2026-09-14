@@ -241,7 +241,6 @@ export function TabStrip({
               cornerRadius: rem * 0.45,
               background:
                 tabs.length > 1 && tab.active && !ghost ? theme.hover : undefined,
-              // a lone tab has no resting background, so hovering it must still say it is clickable
               hoverBackground: ghost || (tab.active && tabs.length > 1) ? undefined : theme.hover,
               flexShrink: tab.active && !ghost ? 1 : 0,
               overflow: "hidden",

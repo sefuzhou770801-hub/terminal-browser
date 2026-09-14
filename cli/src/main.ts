@@ -163,8 +163,6 @@ function connectDaemon(): Promise<net.Socket> {
 
 function spawnDaemon() {
   const { command, cwd } = browserLaunchCommand(["--daemon"]);
-  // The daemon outlives this pane and serves others; per-pane settings travel
-  // with each session request instead.
   const env = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !key.startsWith("PIXEL_")),
   );
@@ -500,7 +498,7 @@ function rejectUnknownFlags(args: string[]) {
     const name = arg.split("=")[0];
     if (APP_MODE_FLAGS.includes(name)) {
       fail(
-        `[placeholder copy: ${name} is deprecated: app mode was removed from terminal-browser. Build the app on pixel instead, see https://github.com/zenbu-labs/terminal-electron]`,
+        `${name} is deprecated: app mode was removed from terminal-browser. If you are building an app, you should migrate to https://github.com/zenbu-labs/pixel`,
       );
     }
     const known = BROWSER_FLAGS.some((flag) =>
@@ -513,7 +511,7 @@ function rejectUnknownFlags(args: string[]) {
 function takeSshFlags(args: string[]): void {
   if (args.some((arg) => /^--ssh-bundle(-dir)?(=|$)/.test(arg))) {
     fail(
-      "--ssh-bundle and --ssh-bundle-dir are no longer part of terminal-browser. You should migrate to https://github.com/zenbu-labs/pixel",
+      "--ssh-bundle and --ssh-bundle-dir are no longer part of terminal-browser. If you are building an app, you should migrate to https://github.com/zenbu-labs/pixel",
     );
   }
   const ssh = takeFlag(args, "--ssh");
@@ -535,10 +533,6 @@ function mergeDisabled(): boolean {
   return process.env.TERMINAL_BROWSER_NO_MERGE === "1";
 }
 
-// Opens the url as a tab in a browser that is already on screen. With a
-// direction, only the browser in the pane directly on that side qualifies, so
-// a --split lands as a tab exactly where the new pane would have appeared.
-// Without one, only an explicitly targeted browser does.
 async function tryAdopt(args: string[], direction: Direction | null): Promise<boolean> {
   const terminal = (await currentTerminal()).terminal;
   let hosts = await findHosts(terminal).catch(() => []);

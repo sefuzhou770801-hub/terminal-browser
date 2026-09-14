@@ -193,7 +193,6 @@ export function recordBarCluster(durationMs: number): ClusterContents {
   return { minutes: durationMs >= 60000 };
 }
 
-// room for the play pill (icon, gap, "space", padding) plus clear air before the track
 const PLAY_CLUSTER_REM = 5.4;
 
 export function recordBarMetrics(layout: ChromeLayout, cluster: ClusterContents): RecordBarMetrics {

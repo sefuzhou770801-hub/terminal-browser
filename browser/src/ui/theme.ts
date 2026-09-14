@@ -2,7 +2,6 @@ import type { EngineInfo, Rgba } from "@zenbu-labs/pixel";
 
 export interface Theme {
   bg: Rgba;
-  // floating surfaces (menus, palettes, toasts) stay on this even when bg is transparent
   overlay: Rgba;
   fg: Rgba;
   muted: Rgba;
@@ -10,8 +9,6 @@ export interface Theme {
   accent: Rgba;
   field: Rgba;
   fieldBorder: Rgba;
-  // the page/devtools frame outline, strong enough that the rounded corner
-  // reads as drawn against whatever the terminal shows behind it
   frame: Rgba;
   hover: Rgba;
   hoverStrong: Rgba;
