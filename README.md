@@ -84,6 +84,9 @@ The alternative is running terminal-browser directly on the machine you are shh'
 
 
 
+### Embedded mode
+terminal-browser supports embedding inside of existing TUIs. See
+[examples/embedded](examples/embedded/) for a reference implementation
 
 ### Roadmap
 - linux support ✅
