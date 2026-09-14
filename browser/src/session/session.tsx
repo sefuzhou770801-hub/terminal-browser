@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 
 import { app } from "electron";
-import { createRoot } from "terminal-electron";
+import { createRoot } from "@zenbu-labs/pixel";
 import type {
   DevtoolsDock,
   DownloadProgress,
@@ -10,9 +10,9 @@ import type {
   Root,
   WebViewHandle,
   WebViewState,
-} from "terminal-electron";
-import { detect } from "terminal-electron/terminal";
-import type { Pane, Terminal } from "terminal-electron/terminal";
+} from "@zenbu-labs/pixel";
+import { detect } from "@zenbu-labs/pixel/terminal";
+import type { Pane, Terminal } from "@zenbu-labs/pixel/terminal";
 
 import { bundledAsset } from "../assets";
 import { Grab, reactGrabPreloadPath } from "../grab/grab";
@@ -364,7 +364,7 @@ class Session {
     else this.tabs.close(id);
   }
 
-  // What another terminal-electron app shows on this browser's tab when the
+  // What another pixel app shows on this browser's tab when the
   // browser is a guest in its pane.
   private syncTitle() {
     const state = this.tabs.activeState;
@@ -388,13 +388,13 @@ class Session {
     this.root?.nudgeResize();
   }
 
-  // The app is started on this browser's tty, so if it is a terminal-electron
+  // The app is started on this browser's tty, so if it is a pixel
   // app it joins this pane as a tab rather than opening one of its own.
   private launchApp(app: RegisteredApp) {
     const env = { ...this.ctx.env };
     if (this.registry) env.TERMINAL_BROWSER_INTEROP_TARGET = this.registry.socketPath;
-    const tty = this.ctx.tty ?? process.env.TERMINAL_ELECTRON_TTY;
-    if (tty) env.TERMINAL_ELECTRON_TTY = tty;
+    const tty = this.ctx.tty ?? process.env.PIXEL_TTY;
+    if (tty) env.PIXEL_TTY = tty;
     try {
       const child = spawn(app.bin, app.args, {
         cwd: this.ctx.cwd,
@@ -662,7 +662,7 @@ class Session {
   }
 
   // Returns true when the browser consumed the key; anything else reaches the
-  // focused page through terminal-electron.
+  // focused page through pixel.
   private handleKey(event: EngineKeyEvent): boolean {
     const handle = this.tabs.activeHandle;
     if (event.kind === "release") return false;

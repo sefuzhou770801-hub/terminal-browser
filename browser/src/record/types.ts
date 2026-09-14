@@ -1,4 +1,4 @@
-import type { DragEvent, MouseMoveEvent, Surface, WheelEvent } from "terminal-electron";
+import type { DragEvent, MouseMoveEvent, Surface, WheelEvent } from "@zenbu-labs/pixel";
 import type { CropScope, MarkupObject, Rect, Tool, Vec } from "./model";
 
 export type InteractionKind = "click" | "link" | "reload" | "load";

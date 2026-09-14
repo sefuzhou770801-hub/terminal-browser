@@ -84,8 +84,6 @@ The alternative is running terminal-browser directly on the machine you are shh'
 
 
 
-### Composing with other terminal-electron apps
-[placeholder copy: terminal-browser is a terminal-electron app, so any other terminal-electron app can share its pane. Register one with `terminal-browser register-app`, then pick it from the command palette: it opens as a tab next to the browser, in the same pane. Apps built for the terminal with browser technology live at https://github.com/zenbu-labs/terminal-electron.]
 
 ### Roadmap
 - linux support ✅

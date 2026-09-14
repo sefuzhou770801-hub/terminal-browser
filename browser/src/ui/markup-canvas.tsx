@@ -1,5 +1,5 @@
-import { Box, Input, Path, Text } from "terminal-electron";
-import type { Rgba, Surface } from "terminal-electron";
+import { Box, Input, Path, Text } from "@zenbu-labs/pixel";
+import type { Rgba, Surface } from "@zenbu-labs/pixel";
 import {
   CROP_SCOPES,
   MARKUP_COLORS,

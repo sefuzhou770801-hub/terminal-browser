@@ -6,7 +6,7 @@ import type {
   PointerEvent,
   Surface,
   WheelEvent,
-} from "terminal-electron";
+} from "@zenbu-labs/pixel";
 import type { RecordTarget } from "./recorder";
 import { zoomDirection } from "../zoom";
 import { toolbarSize } from "../ui/markup-canvas";

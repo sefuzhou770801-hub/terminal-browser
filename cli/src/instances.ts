@@ -1,5 +1,5 @@
-import { callerTty } from "terminal-electron/terminal";
-import type { Direction, Pane, Terminal } from "terminal-electron/terminal";
+import { callerTty } from "@zenbu-labs/pixel/terminal";
+import type { Direction, Pane, Terminal } from "@zenbu-labs/pixel/terminal";
 
 import { control, WHERE_TIMEOUT_MS } from "./control";
 import { instances } from "./registry";

@@ -6,7 +6,7 @@ import type {
   PointerEvent,
   WebViewHandle,
   WebViewState,
-} from "terminal-electron";
+} from "@zenbu-labs/pixel";
 import type { RecordActions } from "../record/types";
 
 export interface PaletteView {

@@ -1,4 +1,4 @@
-import { Box, Image, Path, Text } from "terminal-electron";
+import { Box, Image, Path, Text } from "@zenbu-labs/pixel";
 import type { Theme } from "./theme";
 import type { ChromeActions, ChromeLayout, PageMenuIcon, PageMenuItem, PageMenuView } from "./types";
 

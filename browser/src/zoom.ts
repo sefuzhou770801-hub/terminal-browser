@@ -1,4 +1,4 @@
-import type { ZoomDirection } from "terminal-electron";
+import type { ZoomDirection } from "@zenbu-labs/pixel";
 
 export type { ZoomDirection };
 

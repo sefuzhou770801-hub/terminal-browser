@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Box, Image, Text } from "terminal-electron";
+import { Box, Image, Text } from "@zenbu-labs/pixel";
 import { displayUrl } from "../url";
 import { Icon } from "./icons";
 import { usePulse } from "./pulse";

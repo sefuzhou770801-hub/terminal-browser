@@ -1,4 +1,4 @@
-import type { EngineInfo, Rgba } from "terminal-electron";
+import type { EngineInfo, Rgba } from "@zenbu-labs/pixel";
 
 export interface Theme {
   bg: Rgba;

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 
-import { callerTty } from "terminal-electron/terminal";
+import { callerTty } from "@zenbu-labs/pixel/terminal";
 import {
   INTEROP_PROTOCOL_VERSIONS,
   advertiseInstance,
@@ -13,7 +13,7 @@ import {
 } from "pixel-store";
 import type { InstanceRow } from "pixel-store";
 
-import type { WebViewState } from "terminal-electron";
+import type { WebViewState } from "@zenbu-labs/pixel";
 import { INSTANCES_DIR } from "pixel-store";
 
 export interface Where {

@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import { captureFilmstrip } from "terminal-electron";
-import type { SurfaceCapture, WebViewHandle } from "terminal-electron";
+import { captureFilmstrip } from "@zenbu-labs/pixel";
+import type { SurfaceCapture, WebViewHandle } from "@zenbu-labs/pixel";
 
 export interface RecordTarget {
   readonly tabId: number;

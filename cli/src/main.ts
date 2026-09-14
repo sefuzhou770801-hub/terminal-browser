@@ -21,9 +21,9 @@ import {
   checkTerminal,
   detect,
   unsupportedGraphicsMessage,
-} from "terminal-electron/terminal";
-import { findOwner } from "terminal-electron/terminal";
-import type { Direction, Terminal, TerminalCheck } from "terminal-electron/terminal";
+} from "@zenbu-labs/pixel/terminal";
+import { findOwner } from "@zenbu-labs/pixel/terminal";
+import type { Direction, Terminal, TerminalCheck } from "@zenbu-labs/pixel/terminal";
 import { actionCommand } from "./action";
 import { control } from "./control";
 import { setupCommand } from "./editors";
@@ -35,7 +35,7 @@ import { findHosts, openInHost } from "./interop";
 import { lsCommand } from "./ls";
 import { instances } from "./registry";
 import { apparmorSetup, deniedRefusal, linuxSandboxError, sandboxRefusal } from "./sandbox";
-import { connectSsh, validateSshTarget } from "terminal-electron/ssh";
+import { connectSsh, validateSshTarget } from "@zenbu-labs/pixel/ssh";
 import type { InstanceRecord } from "./registry";
 import { installedVersion, upgradeCommand } from "./upgrade";
 
@@ -72,11 +72,11 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const ELECTRON_DIST_BIN =
   process.platform === "darwin"
     ? ["terminal-browser.app", "Contents", "MacOS", "terminal-browser"]
-    : ["electron"];
+    : ["pixel"];
 const ELECTRON_DEV_BIN =
   process.platform === "darwin"
-    ? ["Electron.app", "Contents", "MacOS", "Electron"]
-    : ["electron"];
+    ? ["Electron.app", "Contents", "MacOS", "pixel"]
+    : ["pixel"];
 
 function browserDirectory(): string {
   return path.resolve(__dirname, "..", "..", "browser");
@@ -84,7 +84,7 @@ function browserDirectory(): string {
 
 function electronBinary(): string {
   if (DIST_ROOT) return path.join(DIST_ROOT, "electron", ...ELECTRON_DIST_BIN);
-  const library = require.resolve("terminal-electron/package.json", { paths: [browserDirectory()] });
+  const library = require.resolve("@zenbu-labs/pixel/package.json", { paths: [browserDirectory()] });
   return path.join(path.dirname(library), "electron", "dist", ...ELECTRON_DEV_BIN);
 }
 
@@ -166,7 +166,7 @@ function spawnDaemon() {
   // The daemon outlives this pane and serves others; per-pane settings travel
   // with each session request instead.
   const env = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => !key.startsWith("TERMINAL_ELECTRON_")),
+    Object.entries(process.env).filter(([key]) => !key.startsWith("PIXEL_")),
   );
   const child = spawn(command[0], command.slice(1), { cwd, detached: true, stdio: "ignore", env });
   child.unref();
@@ -317,7 +317,7 @@ async function kill(pid: number, why: string): Promise<number> {
 }
 
 async function attachHere(argv: string[]): Promise<never> {
-  const tty = process.env.TERMINAL_ELECTRON_TTY ?? ownTtyPath();
+  const tty = process.env.PIXEL_TTY ?? ownTtyPath();
   if (!tty) throw new Error("not running on a tty");
   const { socket, reply } = await openSession(argv, tty);
   if (reply.ok === false || !reply.session) {
@@ -500,7 +500,7 @@ function rejectUnknownFlags(args: string[]) {
     const name = arg.split("=")[0];
     if (APP_MODE_FLAGS.includes(name)) {
       fail(
-        `[placeholder copy: ${name} is deprecated: app mode was removed from terminal-browser. Build the app on terminal-electron instead, see https://terminal-electron.com/docs]`,
+        `[placeholder copy: ${name} is deprecated: app mode was removed from terminal-browser. Build the app on pixel instead, see https://github.com/zenbu-labs/terminal-electron]`,
       );
     }
     const known = BROWSER_FLAGS.some((flag) =>
@@ -513,7 +513,7 @@ function rejectUnknownFlags(args: string[]) {
 function takeSshFlags(args: string[]): void {
   if (args.some((arg) => /^--ssh-bundle(-dir)?(=|$)/.test(arg))) {
     fail(
-      "[placeholder copy: --ssh-bundle and --ssh-bundle-dir are no longer part of terminal-browser. Remote apps are built with terminal-electron, whose ssh support (terminal-electron/ssh) installs and starts a bundle on the server.]",
+      "--ssh-bundle and --ssh-bundle-dir are no longer part of terminal-browser. You should migrate to https://github.com/zenbu-labs/pixel",
     );
   }
   const ssh = takeFlag(args, "--ssh");
@@ -566,11 +566,8 @@ async function tryAdopt(args: string[], direction: Direction | null): Promise<bo
 
 async function openCommand(args: string[]) {
   requirePaneAccess();
-  // Started from inside another terminal-electron app's pane, or by a program
-  // embedding the browser in its own screen: the browser joins it, so nothing
-  // here may probe or split the terminal.
-  const owned = process.env.TERMINAL_ELECTRON_TTY ?? ownTtyPath();
-  if (process.env.TERMINAL_ELECTRON_EMBED || (owned && findOwner(owned))) {
+  const owned = process.env.PIXEL_TTY ?? ownTtyPath();
+  if (process.env.PIXEL_EMBED || (owned && findOwner(owned))) {
     rejectUnknownFlags(args);
     return openHere(args);
   }

@@ -73,7 +73,7 @@ EOF
 chmod +x "$BIN_HOME/terminal-browser"
 
 if [ "$(uname -s)" = Linux ]; then
-  missing="$(ldd "$APP/electron/electron" 2>/dev/null | awk '/not found/{print $1}' | sort -u)"
+  missing="$(ldd "$APP/electron/pixel" 2>/dev/null | awk '/not found/{print $1}' | sort -u)"
   if [ -n "$missing" ]; then
     echo "warning: missing system libraries:" >&2
     printf '  %s\n' $missing >&2

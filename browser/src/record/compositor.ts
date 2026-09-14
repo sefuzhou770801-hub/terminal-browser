@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import { encodeRecording } from "terminal-electron";
+import { encodeRecording } from "@zenbu-labs/pixel";
 import { clampRect, moveObject } from "./model";
 import { buildSampleTimes } from "./samples";
 import { lastIndexAtOrBefore } from "./recorder";

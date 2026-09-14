@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { shellLiteral } from "terminal-electron/terminal";
+import { shellLiteral } from "@zenbu-labs/pixel/terminal";
 import { codingAgent } from "./agents";
-import type { Pane, PaneDetails, Terminal } from "terminal-electron/terminal";
+import type { Pane, PaneDetails, Terminal } from "@zenbu-labs/pixel/terminal";
 
 const exec = promisify(execFile);
 

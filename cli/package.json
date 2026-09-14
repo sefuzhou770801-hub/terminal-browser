@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "pixel-store": "workspace:*",
-    "terminal-electron": "0.0.11"
+    "@zenbu-labs/pixel": "0.0.12"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

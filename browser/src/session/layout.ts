@@ -1,4 +1,4 @@
-import type { DevtoolsDock, EngineInfo } from "terminal-electron";
+import type { DevtoolsDock, EngineInfo } from "@zenbu-labs/pixel";
 
 export interface SurfaceLayout {
   x: number;

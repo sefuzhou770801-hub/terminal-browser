@@ -16,20 +16,20 @@ case "$(uname -s)-$(uname -m)" in
 esac
 
 rm -rf "$OUT"
-mkdir -p "$STAGE"/{bin,cli/dist,browser/dist,browser/node_modules,electron,agent-browser/bin,assets/fonts,scripts}
+mkdir -p "$STAGE"/{bin,cli/dist,browser/dist,browser/node_modules/@zenbu-labs,electron,agent-browser/bin,assets/fonts,scripts}
 
-# terminal-electron resolves its engine binary and scroll helper from this package at runtime;
-# it comes from npm, or from a local checkout after scripts/link-terminal-electron.sh
+# pixel resolves its engine binary and scroll helper from this package at runtime;
+# it comes from npm, or from a local checkout after scripts/link-pixel.sh
 NATIVE_PKG="$(node -e '
-  const lib = require.resolve("terminal-electron/package.json", { paths: [process.argv[1]] });
-  const pkg = require.resolve(`terminal-electron-native-${process.argv[2]}/package.json`, { paths: [require("path").dirname(lib)] });
+  const lib = require.resolve("@zenbu-labs/pixel/package.json", { paths: [process.argv[1]] });
+  const pkg = require.resolve(`@zenbu-labs/pixel-native-${process.argv[2]}/package.json`, { paths: [require("path").dirname(lib)] });
   process.stdout.write(require("fs").realpathSync(require("path").dirname(pkg)));
 ' "$ROOT/browser" "$TARGET" 2>/dev/null || true)"
 if [ -z "$NATIVE_PKG" ] || [ ! -f "$NATIVE_PKG/pixel.node" ]; then
-  echo "refusing to build: terminal-electron-native-$TARGET is not installed in browser/ (pnpm install, or scripts/link-terminal-electron.sh for a local checkout)" >&2
+  echo "refusing to build: @zenbu-labs/pixel-native-$TARGET is not installed in browser/ (pnpm install, or scripts/link-pixel.sh for a local checkout)" >&2
   exit 1
 fi
-cp -RL "$NATIVE_PKG" "$STAGE/browser/node_modules/terminal-electron-native-$TARGET"
+cp -RL "$NATIVE_PKG" "$STAGE/browser/node_modules/@zenbu-labs/pixel-native-$TARGET"
 if [ -n "$DARWIN_ARCH" ]; then
   cp "$NATIVE_PKG/native-scroll-helper" "$STAGE/bin/native-scroll-helper"
 fi
@@ -53,11 +53,11 @@ cp "$ROOT/assets/react-grab/"* "$STAGE/assets/react-grab/"
 
 ELECTRON_DIST="$(node -e '
   const p = require("path");
-  const lib = require.resolve("terminal-electron/package.json", { paths: [process.argv[1]] });
+  const lib = require.resolve("@zenbu-labs/pixel/package.json", { paths: [process.argv[1]] });
   console.log(p.join(p.dirname(lib), "electron", "dist"));
 ' "$ROOT/browser")"
 if [ ! -f "$ELECTRON_DIST/.zenbu-electron-sha256" ]; then
-  echo "refusing to build: terminal-electron has not installed its patched electron (run pnpm install)" >&2
+  echo "refusing to build: pixel has not installed its patched electron (run pnpm install)" >&2
   exit 1
 fi
 FRAMEWORK_BINARY="$ELECTRON_DIST/Electron.app/Contents/Frameworks/Electron Framework.framework/Electron Framework"
@@ -73,7 +73,7 @@ fi
 if [ -n "$DARWIN_ARCH" ]; then
   APP="$STAGE/electron/terminal-browser.app"
   ditto "$ELECTRON_DIST/Electron.app" "$APP"
-  mv "$APP/Contents/MacOS/Electron" "$APP/Contents/MacOS/terminal-browser"
+  mv "$APP/Contents/MacOS/pixel" "$APP/Contents/MacOS/terminal-browser"
   /usr/libexec/PlistBuddy \
     -c "Set :CFBundleExecutable terminal-browser" \
     -c "Set :CFBundleName terminal-browser" \
@@ -85,9 +85,9 @@ if [ -n "$DARWIN_ARCH" ]; then
   FUSE_TARGET="$APP"
 else
   cp -a "$ELECTRON_DIST/." "$STAGE/electron/"
-  ELECTRON_EXE="electron/electron"
+  ELECTRON_EXE="electron/pixel"
   NATIVE_SCROLL=""
-  FUSE_TARGET="$STAGE/electron/electron"
+  FUSE_TARGET="$STAGE/electron/pixel"
 fi
 
 TOOLS="$OUT/tools"

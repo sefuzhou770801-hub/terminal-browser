@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Box, DevTools, WebView } from "terminal-electron";
-import type { EngineInfo, Surface } from "terminal-electron";
-import type { WebViewState } from "terminal-electron";
+import { Box, DevTools, WebView } from "@zenbu-labs/pixel";
+import type { EngineInfo, Surface } from "@zenbu-labs/pixel";
+import type { WebViewState } from "@zenbu-labs/pixel";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { PageContextMenu } from "./context-menu";

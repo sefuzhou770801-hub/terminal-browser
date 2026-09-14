@@ -1,5 +1,5 @@
-import { Box, Text } from "terminal-electron";
-import type { Rgba } from "terminal-electron";
+import { Box, Text } from "@zenbu-labs/pixel";
+import type { Rgba } from "@zenbu-labs/pixel";
 import type { Rect } from "../record/model";
 import { Icon } from "./icons";
 import { mix, withAlpha } from "./theme";

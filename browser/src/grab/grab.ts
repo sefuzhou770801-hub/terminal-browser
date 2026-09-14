@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { app } from "electron";
-import type { WebViewHandle } from "terminal-electron";
+import type { WebViewHandle } from "@zenbu-labs/pixel";
 import { bundledAsset } from "../assets";
 
 const CHANNEL = "grab";

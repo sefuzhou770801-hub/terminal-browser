@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Box, Input, Text } from "terminal-electron";
-import type { NodeHandle } from "terminal-electron";
-import type { WebViewState } from "terminal-electron";
+import { Box, Input, Text } from "@zenbu-labs/pixel";
+import type { NodeHandle } from "@zenbu-labs/pixel";
+import type { WebViewState } from "@zenbu-labs/pixel";
 import { Icon } from "./icons";
 import type { Theme } from "./theme";
 import type { ChromeActions, ChromeLayout, NewTabView, PaletteView } from "./types";

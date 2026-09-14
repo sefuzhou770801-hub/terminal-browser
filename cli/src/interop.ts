@@ -1,5 +1,5 @@
-import { callerTty } from "terminal-electron/terminal";
-import type { Terminal } from "terminal-electron/terminal";
+import { callerTty } from "@zenbu-labs/pixel/terminal";
+import type { Terminal } from "@zenbu-labs/pixel/terminal";
 import { INTEROP_PROTOCOL_VERSIONS, listInteropInstances } from "pixel-store";
 import type { InteropInstance, OpenSpec } from "pixel-store";
 

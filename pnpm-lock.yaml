@@ -17,6 +17,9 @@ importers:
 
   browser:
     dependencies:
+      '@zenbu-labs/pixel':
+        specifier: 0.0.12
+        version: 0.0.12(react@18.3.1)
       pixel-store:
         specifier: workspace:*
         version: link:../store
@@ -26,9 +29,6 @@ importers:
       react-grab:
         specifier: 0.2.0
         version: 0.2.0(react@18.3.1)
-      terminal-electron:
-        specifier: 0.0.11
-        version: 0.0.11(react@18.3.1)
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -42,12 +42,12 @@ importers:
 
   cli:
     dependencies:
+      '@zenbu-labs/pixel':
+        specifier: 0.0.12
+        version: 0.0.12(react@18.3.1)
       pixel-store:
         specifier: workspace:*
         version: link:../store
-      terminal-electron:
-        specifier: 0.0.11
-        version: 0.0.11(react@18.3.1)
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -561,6 +561,32 @@ packages:
     resolution: {integrity: sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A==}
     engines: {node: '>=14.6'}
 
+  '@zenbu-labs/pixel-native-darwin-arm64@0.0.12':
+    resolution: {integrity: sha512-5Zvtn8xJZEfZM7MB1py9Z/PUQjoPBjetYJlFIeKo9g9WZ1GNVmGy9dxzpJ2pjBM6EJlr8scMSZMFv1B0yd0u0Q==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@zenbu-labs/pixel-native-darwin-x64@0.0.12':
+    resolution: {integrity: sha512-Qa89lpN6pmVKskbyYPehOrjSJr1wr5g+cKrEpLVogRxlzjZJLfoijbndvGgl5o853zPy44KF2QAkvjx4wU06xg==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@zenbu-labs/pixel-native-linux-arm64@0.0.12':
+    resolution: {integrity: sha512-vJm5B53JnThq+ZKfTFaiIuHWmdS+s+t6CjMZhVy0l5u4xYSwYDE9Q4ju3/v0+kitkXsrsf7cXXYzBVm5XIeJXw==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@zenbu-labs/pixel-native-linux-x64@0.0.12':
+    resolution: {integrity: sha512-V+iaKpu1Nz91okedNkGi98/LUnsd1qemi4O5gUoqxobQRpc50768H8JS0zvansw7JVKG8BTfdaW3jnsdpgijTQ==}
+    cpu: [x64]
+    os: [linux]
+
+  '@zenbu-labs/pixel@0.0.12':
+    resolution: {integrity: sha512-0SnSmfmcYpvSznUimHxyX6xTuK7mZspQzILErk3iVZxvBAavvFUZbdRdksVa3BQG4uIWwz2qcoH2EizMxaWhIA==}
+    hasBin: true
+    peerDependencies:
+      react: ^18.3.1
+
   agent-install@0.0.6:
     resolution: {integrity: sha512-7NRMZ/ZDz2vHevQTgJsocBFpakB1/Wx5ip19YSJuj4VOXpraWztTerViNtdSyARKZT9e2yVwUUB5JXXCE7mNrA==}
     hasBin: true
@@ -986,32 +1012,6 @@ packages:
     resolution: {integrity: sha512-ujeqbceABgwMZxEJnk2HDY2DlnUZ+9oEcb1KzTVfYHio0UE6dG71n60d8D2I4qNvleWrrXpmjpt7vZeF1LnMZQ==}
     engines: {node: '>=6'}
 
-  terminal-electron-native-darwin-arm64@0.0.11:
-    resolution: {integrity: sha512-ZuYFeCU+59xNZEETPfzEZAz+G66Ptjd15pwsjhK5XRt8Ng22PXOgX8/GbbeOaDw+FkHKSSEI5sXV6gngj+x6/Q==}
-    cpu: [arm64]
-    os: [darwin]
-
-  terminal-electron-native-darwin-x64@0.0.11:
-    resolution: {integrity: sha512-O5+s10QngWyCP5CkK/K7B5TwInbSz84+b5XyPXTCdO2lFjuPCnTCMIJsv4iPvuL1nHHrC4l08njCG75VXiGPaQ==}
-    cpu: [x64]
-    os: [darwin]
-
-  terminal-electron-native-linux-arm64@0.0.11:
-    resolution: {integrity: sha512-XelIV1sdmWv8bfuH0Tl11MhN5Nm82ynoE3Uhk9FYemkAxOxFT0VrMQhoJT4uE+C5qwYosO9cuoHMex4JpJ8Wjg==}
-    cpu: [arm64]
-    os: [linux]
-
-  terminal-electron-native-linux-x64@0.0.11:
-    resolution: {integrity: sha512-YOWVmjRcx4FMZaKd8GIKuHB0u4uz/6hINUgR0/gxmpisovcaYhD8viA5Jd/Q5tv6sDt0xJDV4Cv7oSlWmeUzig==}
-    cpu: [x64]
-    os: [linux]
-
-  terminal-electron@0.0.11:
-    resolution: {integrity: sha512-NxmTqWIKDgQuESvHFn5ReLvRp2gv7nnQR8D9eX9zfb/EuI+vfQDB3WX9BTwbLNOL8l44xmRkD1vzcRkL+v3P5Q==}
-    hasBin: true
-    peerDependencies:
-      react: ^18.3.1
-
   tinyexec@1.3.0:
     resolution: {integrity: sha512-QKAl9m8gWWGHV8jZcPeym6j+XULi6tOf1mT83WYJ4Lk2ytW/uwAWkrP0uFsdoYMdueVJ0qs26wZ+23xeB4ibNQ==}
     engines: {node: '>=18'}
@@ -1335,6 +1335,28 @@ snapshots:
       csstype: 3.2.3
 
   '@xmldom/xmldom@0.9.12': {}
+
+  '@zenbu-labs/pixel-native-darwin-arm64@0.0.12':
+    optional: true
+
+  '@zenbu-labs/pixel-native-darwin-x64@0.0.12':
+    optional: true
+
+  '@zenbu-labs/pixel-native-linux-arm64@0.0.12':
+    optional: true
+
+  '@zenbu-labs/pixel-native-linux-x64@0.0.12':
+    optional: true
+
+  '@zenbu-labs/pixel@0.0.12(react@18.3.1)':
+    dependencies:
+      react: 18.3.1
+      react-reconciler: 0.29.2(react@18.3.1)
+    optionalDependencies:
+      '@zenbu-labs/pixel-native-darwin-arm64': 0.0.12
+      '@zenbu-labs/pixel-native-darwin-x64': 0.0.12
+      '@zenbu-labs/pixel-native-linux-arm64': 0.0.12
+      '@zenbu-labs/pixel-native-linux-x64': 0.0.12
 
   agent-install@0.0.6:
     dependencies:
@@ -1769,28 +1791,6 @@ snapshots:
       inherits: 2.0.4
       readable-stream: 3.6.2
     optional: true
-
-  terminal-electron-native-darwin-arm64@0.0.11:
-    optional: true
-
-  terminal-electron-native-darwin-x64@0.0.11:
-    optional: true
-
-  terminal-electron-native-linux-arm64@0.0.11:
-    optional: true
-
-  terminal-electron-native-linux-x64@0.0.11:
-    optional: true
-
-  terminal-electron@0.0.11(react@18.3.1):
-    dependencies:
-      react: 18.3.1
-      react-reconciler: 0.29.2(react@18.3.1)
-    optionalDependencies:
-      terminal-electron-native-darwin-arm64: 0.0.11
-      terminal-electron-native-darwin-x64: 0.0.11
-      terminal-electron-native-linux-arm64: 0.0.11
-      terminal-electron-native-linux-x64: 0.0.11
 
   tinyexec@1.3.0: {}
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Box, Input, Text } from "terminal-electron";
-import type { WebViewState } from "terminal-electron";
+import { Box, Input, Text } from "@zenbu-labs/pixel";
+import type { WebViewState } from "@zenbu-labs/pixel";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { mix, type Theme } from "./theme";

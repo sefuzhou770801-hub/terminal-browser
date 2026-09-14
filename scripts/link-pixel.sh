@@ -1,11 +1,8 @@
 #!/bin/bash
-# Points this repo at a local checkout of terminal-electron instead of the npm
-# release, for working on both at once. Run again after changing the library;
-# `--unlink` puts the npm dependency back.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-LIB="${TERMINAL_ELECTRON_DIR:-$ROOT/../terminal-electron}"
+LIB="${PIXEL_DIR:-$ROOT/../pixel}"
 case "$(uname -s)-$(uname -m)" in
   Darwin-arm64) TARGET=darwin-arm64 ;;
   Darwin-x86_64) TARGET=darwin-x64 ;;
@@ -19,7 +16,7 @@ if [ "${1:-}" = "--unlink" ]; then
     const fs = require("fs");
     for (const file of ["browser/package.json", "cli/package.json"]) {
       const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
-      pkg.dependencies["terminal-electron"] = "0.0.11";
+      pkg.dependencies["@zenbu-labs/pixel"] = "0.0.12";
       fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
     }
     const root = JSON.parse(fs.readFileSync("package.json", "utf8"));
@@ -27,14 +24,14 @@ if [ "${1:-}" = "--unlink" ]; then
     fs.writeFileSync("package.json", JSON.stringify(root, null, 2) + "\n");
   '
   cd "$ROOT" && pnpm install
-  echo "back on the npm release of terminal-electron"
+  echo "back on the npm release of pixel"
   exit 0
 fi
 
 LIB="$(cd "$LIB" && pwd)"
-[ -f "$LIB/packages/terminal-electron/package.json" ] || { echo "no terminal-electron checkout at $LIB (set TERMINAL_ELECTRON_DIR)" >&2; exit 1; }
+[ -f "$LIB/packages/pixel/package.json" ] || { echo "no pixel checkout at $LIB (set PIXEL_DIR)" >&2; exit 1; }
 
-(cd "$LIB" && pnpm --filter terminal-electron build && pnpm --filter terminal-electron build:native -- --release)
+(cd "$LIB" && pnpm --filter @zenbu-labs/pixel build && pnpm --filter @zenbu-labs/pixel build:native -- --release)
 
 # file: copies the package into node_modules, so its imports of react and electron
 # resolve here rather than in the library repo (a symlink would give two Reacts).
@@ -44,13 +41,13 @@ node -e '
   const rel = (from, to) => "file:" + path.relative(path.resolve(from), to);
   for (const file of ["browser/package.json", "cli/package.json"]) {
     const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
-    pkg.dependencies["terminal-electron"] = rel(path.dirname(file), `${lib}/packages/terminal-electron`);
+    pkg.dependencies["@zenbu-labs/pixel"] = rel(path.dirname(file), `${lib}/packages/pixel`);
     fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
   }
   const root = JSON.parse(fs.readFileSync("package.json", "utf8"));
   root.pnpm = root.pnpm ?? {};
-  root.pnpm.overrides = { ...(root.pnpm.overrides ?? {}), [`terminal-electron-native-${target}`]: rel(".", `${lib}/packages/native/${target}`) };
+  root.pnpm.overrides = { ...(root.pnpm.overrides ?? {}), [`@zenbu-labs/pixel-native-${target}`]: rel(".", `${lib}/packages/native/${target}`) };
   fs.writeFileSync("package.json", JSON.stringify(root, null, 2) + "\n");
 ' "$LIB" "$TARGET"
 cd "$ROOT" && pnpm install
-echo "linked to $LIB (package.json now points at it; ./scripts/link-terminal-electron.sh --unlink to go back)"
+echo "linked to $LIB (package.json now points at it; ./scripts/link-pixel.sh --unlink to go back)"

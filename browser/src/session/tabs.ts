@@ -1,6 +1,6 @@
 import { createRef } from "react";
 import type { RefObject } from "react";
-import type { OpenWindowDecision, WebViewHandle, WebViewState } from "terminal-electron";
+import type { OpenWindowDecision, WebViewHandle, WebViewState } from "@zenbu-labs/pixel";
 
 import type { TabRow } from "../ui/types";
 import { displayUrl } from "../url";
