@@ -17,6 +17,7 @@ import type { Pane, Terminal } from "@zenbu-labs/pixel/terminal";
 import { bundledAsset } from "../assets";
 import { Grab, reactGrabPreloadPath } from "../grab/grab";
 import { AgentPaneFinder } from "../grab/target";
+import type { EmbeddedAgent } from "../grab/target";
 import { zoomDirection } from "../zoom";
 import type { ZoomDirection } from "../zoom";
 import { lastUrl, listApps, setLastUrl, settings, store } from "pixel-store";
@@ -40,6 +41,9 @@ import type {
   TabView,
 } from "../ui/types";
 import { displayUrl, normalizeUrl, searchOrUrl } from "../url";
+import { START_URL } from "../pages/scheme";
+import type { PageContext } from "../pages/scheme";
+import { makeTheme } from "../ui/theme";
 import { fuzzyScore } from "./fuzzy";
 import {
   bindingLabel,
@@ -73,6 +77,8 @@ export interface SessionHandle {
   ready: Promise<void>;
   close(code?: number): void;
   nudgeResize(): void;
+  pageContext(): PageContext;
+  showsStartPage(): boolean;
 }
 
 export function createSession(ctx: SessionContext): SessionHandle {
@@ -85,10 +91,12 @@ export function createSession(ctx: SessionContext): SessionHandle {
     ready,
     close: (code = 0) => session.shutdown(code),
     nudgeResize: () => session.nudgeResize(),
+    pageContext: () => session.pageContext(),
+    showsStartPage: () => session.showsStartPage(),
   };
 }
 
-const DEFAULT_URL = "https://github.com/zenbu-labs";
+const DEFAULT_URL = START_URL;
 
 const FONT_FILE = path.join("fonts", "JetBrainsMono-Regular.ttf");
 
@@ -217,6 +225,7 @@ class Session {
       parentTty: flagValue(this.argv, "--parent-tty"),
       cwd: ctx.cwd,
       self: () => this.findOwnPane(),
+      embedded: embeddedAgent(ctx.env.TERMINAL_BROWSER_AGENT_BRIDGE),
     });
     this.sessionFlags = {
       clipboardRead: this.argv.includes("--allow-clipboard-read"),
@@ -1314,6 +1323,15 @@ class Session {
     return normalizeUrl(searchOrUrl(text, this.ctx.cwd), this.ctx.cwd);
   }
 
+  pageContext(): PageContext {
+    const colors = this.root?.info.colors;
+    return { cwd: this.ctx.cwd, theme: colors ? makeTheme(colors) : null };
+  }
+
+  showsStartPage(): boolean {
+    return (this.tabs.activeState?.url ?? "").startsWith(START_URL);
+  }
+
   private initialUrl(): string {
     const arg = this.argv.find((argument) => !argument.startsWith("-"));
     if (arg) return normalizeUrl(arg, this.ctx.cwd);
@@ -1371,4 +1389,18 @@ function rememberUrl(url: string) {
   try {
     setLastUrl(url);
   } catch { }
+}
+
+function embeddedAgent(url: string | undefined): EmbeddedAgent | null {
+  if (!url) return null;
+  return {
+    async send(content) {
+      const response = await fetch(`${url.replace(/\/$/, "")}/agent-text`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: content }),
+      });
+      return response.ok;
+    },
+  };
 }

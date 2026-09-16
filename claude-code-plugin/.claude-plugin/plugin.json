@@ -1,0 +1,24 @@
+{
+  "name": "terminal-browser",
+  "version": "0.0.1",
+  "description": "[placeholder copy: A web browser in a pane beside the transcript, drawn on the terminal. Other plugins can open pages in it through the $.browser noun.]",
+  "author": {
+    "name": "zenbu-labs"
+  },
+  "homepage": "https://github.com/zenbu-labs/terminal-browser/tree/main/claude-code-plugin",
+  "repository": "https://github.com/zenbu-labs/terminal-browser",
+  "license": "MIT",
+  "keywords": [
+    "browser",
+    "function-hooks"
+  ],
+  "types": "./hooks/browser.d.ts",
+  "userConfig": {
+    "agentTool": {
+      "type": "boolean",
+      "title": "Give the agent a tool to open/close terminal-browser inside claude code",
+      "description": "Adds an open/close tool the model can call to show a page in the browser pane. Off by default.",
+      "default": false
+    }
+  }
+}
