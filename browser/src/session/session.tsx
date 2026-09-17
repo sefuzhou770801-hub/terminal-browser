@@ -216,6 +216,7 @@ class Session {
   private shownRecord: RecordSession | null = null;
   private recordStarting = false;
   private readonly defaultUrl: string;
+  private sessionHidden = false;
 
   constructor(ctx: SessionContext) {
     this.ctx = ctx;
@@ -301,6 +302,11 @@ class Session {
         this.render();
       },
       onColors: () => this.render(),
+      onVisible: (visible) => {
+        if (this.sessionHidden === !visible) return;
+        this.sessionHidden = !visible;
+        this.render();
+      },
       onQuit: () => this.shutdown(),
       onExit: (code) => this.ctx.onClose(code),
     });
@@ -435,6 +441,7 @@ class Session {
       url: tab.url,
       ref: tab.ref,
       active: tab.id === active?.id,
+      hidden: this.sessionHidden,
       partition: this.partition,
       proxy: this.socksPort ? `socks5://127.0.0.1:${this.socksPort}` : null,
       preload: this.browserPreload,

@@ -15,5 +15,10 @@
   "devDependencies": {
     "@electron/osx-sign": "^1.3.3",
     "esbuild": "^0.25.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@zenbu-labs/pixel-native-darwin-arm64": "file:../pixel-cc-embed-gate/packages/native/darwin-arm64"
+    }
   }
 }

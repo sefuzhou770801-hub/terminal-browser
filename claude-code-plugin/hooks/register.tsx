@@ -97,11 +97,12 @@ async function fetchState($: EngineInterface): Promise<BridgeState | null> {
 
 
 async function openBrowser($: EngineInterface, raw: string | null): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
-  const url = raw ? normalizeUrl(raw) : START_URL
   if (state.port === null) {
     const started = await startBridge($)
     if (!started.ok) return started
   }
+  const alive = state.last?.alive === true
+  const url = raw ? normalizeUrl(raw) : (alive && state.last?.url ? state.last.url : START_URL)
   const wasOpen = state.open
   state.pendingUrl = url
   state.open = true
@@ -125,8 +126,9 @@ async function browserClosed($: EngineInterface): Promise<void> {
   state.open = false
   state.pendingUrl = null
   state.region = null
+  // hides the pane but keeps the browser (and its tabs) alive for an instant
+  // resume; the poll keeps state.last (alive, url, placed) current
   await post($, '/browser/close', {})
-  if (state.last) state.last = { ...state.last, placed: null, alive: false }
   if (state.port !== null) startPolling($)
 }
 
@@ -231,10 +233,10 @@ export const register: Register = (on, options) => {
     const arg = e.args.trim()
     if (arg === 'close' || (!arg && state.open)) {
       await closeBrowser($)
-      return { text: 'Opened terminal-browser' }
+      return { text: 'Closed terminal-browser' }
     }
     const opened = await openBrowser($, arg || null)
-    return { text: opened.ok ? '' : opened.error }
+    return { text: opened.ok ? 'Opened terminal-browser' : opened.error }
   })
 
   on('tool.call', { tool: OPEN_TOOL }, async ($, e) => {

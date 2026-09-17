@@ -124,6 +124,7 @@ function render(data: Awaited<ReturnType<typeof collect>>, theme: Theme | null):
   const section = (title: string, rows: string[]) =>
     rows.length === 0 ? "" : `<section><h2>${escape(title)}</h2><ul>${rows.join("")}</ul></section>`;
   const body =
+    section("Pull request", data.pr ? [`<li>${link(data.pr.url, `#${data.pr.number} ${data.pr.title}`)}</li>`] : []) +
     section(
       "Running servers",
       data.ports.map((p) => `<li>${link(`http://localhost:${p.port}`, `localhost:${p.port}`)}<span>${escape(p.command)}</span></li>`),
@@ -131,8 +132,7 @@ function render(data: Awaited<ReturnType<typeof collect>>, theme: Theme | null):
     section(
       "Recent documents",
       data.documents.map((d) => `<li>${link(d.url, d.label)}<span>${escape(d.age)}</span></li>`),
-    ) +
-    section("Pull request", data.pr ? [`<li>${link(data.pr.url, `#${data.pr.number} ${data.pr.title}`)}</li>`] : []);
+    );
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>terminal-browser</title>
 <style>

@@ -280,6 +280,7 @@ class Bridge {
     if (this.alive) {
       if (url && url !== this.url) void this.navigate(url);
       this.send(this.sizeMessage("size"));
+      this.send({ type: "visible", value: true });
       return;
     }
     this.url = url ?? this.url ?? "about:blank";
@@ -374,20 +375,8 @@ class Bridge {
     }
   }
 
-  closeBrowser(): void {
-    const child = this.child;
-    this.child = null;
-    this.alive = false;
-    this.placed = null;
-    this.url = null;
-    if (child && child.exitCode === null) {
-      child.kill("SIGTERM");
-      setTimeout(() => {
-        try {
-          child.kill("SIGKILL");
-        } catch {}
-      }, 3000).unref();
-    }
+  hide(): void {
+    this.send({ type: "visible", value: false });
   }
 
   close(): void {
@@ -470,7 +459,7 @@ function routes(bridge: Bridge): Record<string, (body: unknown) => Reply> {
     }),
     "POST /inbox/take": () => [200, { texts: bridge.inbox.splice(0, bridge.inbox.length) }],
     "POST /browser/close": () => {
-      bridge.closeBrowser();
+      bridge.hide();
       return [200, bridge.state()];
     },
     "POST /close": () => {
