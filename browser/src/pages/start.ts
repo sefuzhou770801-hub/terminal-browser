@@ -132,7 +132,7 @@ function render(data: Awaited<ReturnType<typeof collect>>, theme: Theme | null):
       "Recent documents",
       data.documents.map((d) => `<li>${link(d.url, d.label)}<span>${escape(d.age)}</span></li>`),
     ) +
-    section("[placeholder copy: Pull request]", data.pr ? [`<li>${link(data.pr.url, `#${data.pr.number} ${data.pr.title}`)}</li>`] : []);
+    section("Pull request", data.pr ? [`<li>${link(data.pr.url, `#${data.pr.number} ${data.pr.title}`)}</li>`] : []);
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>terminal-browser</title>
 <style>
@@ -149,7 +149,7 @@ function render(data: Awaited<ReturnType<typeof collect>>, theme: Theme | null):
   .empty { color: ${muted}; }
 </style></head>
 <body>
-${body || `<p class="empty">[placeholder copy: no running servers, no recent documents, no open pull request]</p>`}
+${body || `<p class="empty">no running servers, no recent documents, no open pull request</p>`}
 <script>
   // dev servers come and go: reload only when the lists changed
   const data = () => fetch(location.origin + location.pathname + "?data").then(r => r.ok ? r.text() : null).catch(() => null);
