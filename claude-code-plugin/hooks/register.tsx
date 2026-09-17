@@ -219,7 +219,7 @@ export const register: Register = (on, options) => {
     if (agentToolEnabled) {
       await $.tool.register({
         name: 'open',
-        description: 'Open terminal-browser directly inside calude code. Control the open page with the terminal-browser action CLI.',
+        description: 'Open terminal-browser directly inside claude code. Control the open page with the terminal-browser action CLI.',
         inputSchema: { type: 'object', properties: { url: { type: 'string', description: 'The page to open, as a full url or a host name' } } },
       }).catch(err => $.ui.log(`terminal-browser: open tool not registered: ${err}`))
       await $.tool.register({ name: 'close', description: 'Close the terminal-browser pane.' }).catch(err => $.ui.log(`terminal-browser: close tool not registered: ${err}`))
@@ -231,7 +231,7 @@ export const register: Register = (on, options) => {
     const arg = e.args.trim()
     if (arg === 'close' || (!arg && state.open)) {
       await closeBrowser($)
-      return { text: '' }
+      return { text: 'Opened terminal-browser' }
     }
     const opened = await openBrowser($, arg || null)
     return { text: opened.ok ? '' : opened.error }
