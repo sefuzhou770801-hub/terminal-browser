@@ -13,7 +13,7 @@ export type BridgeState = {
 }
 
 export type LaunchReport =
-  | { port: number }
+  | { port: number; token: string }
   | { error: string; code: 'version' | 'tty' | 'start'; found?: string; required?: string }
 
 export type SizeMessage = { type: 'size'; cols: number; rows: number }

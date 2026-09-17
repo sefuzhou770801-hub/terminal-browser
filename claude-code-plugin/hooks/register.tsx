@@ -25,6 +25,7 @@ const IDLE_POLL_MS = 600
 
 const state = {
   port: null as number | null,
+  token: null as string | null,
   open: false,
   pendingUrl: null as string | null,
   region: null as { cols: number; rows: number } | null,
@@ -35,6 +36,7 @@ const state = {
 }
 
 const bridgeUrl = (path: string) => `http://127.0.0.1:${state.port}${path}`
+const authHeaders = () => ({ authorization: `Bearer ${state.token}` })
 const viewKey = () => `view${state.viewGeneration}`
 
 
@@ -57,6 +59,7 @@ async function startBridge($: EngineInterface): Promise<{ ok: true } | { ok: fal
   if (!isLaunchReport(report)) return { ok: false, error: 'terminal-browser could not start' }
   if ('port' in report) {
     state.port = report.port
+    state.token = report.token
     startPolling($)
     return { ok: true }
   }
@@ -72,7 +75,7 @@ async function post($: EngineInterface, path: string, body: unknown): Promise<un
   try {
     const response = await $.http.fetch(bridgeUrl(path), {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...authHeaders() },
       body: JSON.stringify(body),
     })
     return response.ok ? JSON.parse(response.text || '{}') : null
@@ -84,7 +87,7 @@ async function post($: EngineInterface, path: string, body: unknown): Promise<un
 async function fetchState($: EngineInterface): Promise<BridgeState | null> {
   if (state.port === null) return null
   try {
-    const response = await $.http.fetch(bridgeUrl('/state'))
+    const response = await $.http.fetch(bridgeUrl('/state'), { headers: authHeaders() })
     const parsed: unknown = response.ok ? JSON.parse(response.text) : null
     return isBridgeState(parsed) ? parsed : null
   } catch {
@@ -221,9 +224,6 @@ export const register: Register = (on, options) => {
       }).catch(err => $.ui.log(`terminal-browser: open tool not registered: ${err}`))
       await $.tool.register({ name: 'close', description: 'Close the terminal-browser pane.' }).catch(err => $.ui.log(`terminal-browser: close tool not registered: ${err}`))
     }
-    void startBridge($).then(started => {
-      // if (!started.ok) $.ui.log(`terminal-browser: ${started.error}`)
-    })
     return r
   })
 

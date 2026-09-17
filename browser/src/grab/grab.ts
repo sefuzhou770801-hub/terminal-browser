@@ -44,10 +44,26 @@ const REGISTER_PLUGIN = `(api) => {
   });
 }`;
 
+const COPY_ON_SELECT_BINDING = "__terminalBrowserCopyOnSelect";
+
+const COPY_ON_SELECT_WATCHER = `;(() => {
+  let last = "";
+  document.addEventListener("mouseup", () => {
+    setTimeout(() => {
+      const sel = window.getSelection && window.getSelection();
+      const text = sel ? String(sel).trim() : "";
+      if (text && text !== last && typeof window.${COPY_ON_SELECT_BINDING} === "function") {
+        last = text;
+        window.${COPY_ON_SELECT_BINDING}(text);
+      }
+    }, 0);
+  });
+})();`;
+
 let preloadFile: string | null = null;
-export function reactGrabPreloadPath(): string {
+export function reactGrabPreloadPath(copyOnSelect = false): string {
   if (!preloadFile) {
-    const early = `window.__REACT_GRAB_DISABLED__ = true;\n${reactGrabLibrary()}`;
+    const early = `window.__REACT_GRAB_DISABLED__ = true;\n${reactGrabLibrary()}${copyOnSelect ? `\n${COPY_ON_SELECT_WATCHER}` : ""}`;
     preloadFile = path.join(app.getPath("userData"), "terminal-browser-react-grab-preload.js");
     fs.writeFileSync(
       preloadFile,
@@ -59,6 +75,35 @@ export function reactGrabPreloadPath(): string {
     );
   }
   return preloadFile;
+}
+
+export class CopyOnSelect {
+  private listening = false;
+  private readonly onMessage = (_event: unknown, method: string, params: unknown) => {
+    if (method !== "Runtime.bindingCalled") return;
+    const call = params as { name: string; payload: string };
+    if (call.name === COPY_ON_SELECT_BINDING) this.hooks.copied(call.payload);
+  };
+
+  constructor(
+    private readonly view: WebViewHandle,
+    private readonly hooks: { copied(text: string): void },
+  ) {}
+
+  async enable(): Promise<void> {
+    if (this.listening) return;
+    this.listening = true;
+    await this.view.cdp("Runtime.addBinding", { name: COPY_ON_SELECT_BINDING });
+    this.view.webContents.debugger.on("message", this.onMessage);
+  }
+
+  dispose(): void {
+    if (!this.listening) return;
+    this.listening = false;
+    try {
+      this.view.webContents.debugger.removeListener("message", this.onMessage);
+    } catch {}
+  }
 }
 
 const ACTIVATE_SCRIPT = `(() => {

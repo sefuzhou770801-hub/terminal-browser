@@ -15,7 +15,7 @@ import { detect } from "@zenbu-labs/pixel/terminal";
 import type { Pane, Terminal } from "@zenbu-labs/pixel/terminal";
 
 import { bundledAsset } from "../assets";
-import { Grab, reactGrabPreloadPath } from "../grab/grab";
+import { CopyOnSelect, Grab, reactGrabPreloadPath } from "../grab/grab";
 import { AgentPaneFinder } from "../grab/target";
 import type { EmbeddedAgent } from "../grab/target";
 import { zoomDirection } from "../zoom";
@@ -210,6 +210,8 @@ class Session {
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private records = new Map<number, RecordSession>();
   private grabs = new Map<number, Grab>();
+  private copyWatchers = new Map<number, CopyOnSelect>();
+  private readonly copyOnSelect: boolean;
   private readonly grabIcon = bundledAsset(path.join("react-grab", "logo.png"));
   private readonly agentPanes: AgentPaneFinder;
   private shownRecord: RecordSession | null = null;
@@ -225,7 +227,7 @@ class Session {
       parentTty: flagValue(this.argv, "--parent-tty"),
       cwd: ctx.cwd,
       self: () => this.findOwnPane(),
-      embedded: embeddedAgent(ctx.env.TERMINAL_BROWSER_AGENT_BRIDGE),
+      embedded: embeddedAgent(ctx.env.TERMINAL_BROWSER_AGENT_BRIDGE, ctx.env.TERMINAL_BROWSER_AGENT_TOKEN),
     });
     this.sessionFlags = {
       clipboardRead: this.argv.includes("--allow-clipboard-read"),
@@ -235,7 +237,8 @@ class Session {
     this.socksPort = Number.isInteger(socksPort) && socksPort > 0 ? socksPort : null;
     this.partition = sshTarget ? `ssh-${sshTarget.replace(/[^A-Za-z0-9@._-]/g, "-")}` : null;
     this.fallbackState = initialState(this.initialUrl());
-    this.browserPreload = reactGrabPreloadPath();
+    this.copyOnSelect = ctx.env.TERMINAL_BROWSER_COPY_ON_SELECT === "1";
+    this.browserPreload = reactGrabPreloadPath(this.copyOnSelect);
     this.tabs = new TabManager(
       {
         onActivated: () => {
@@ -259,9 +262,15 @@ class Session {
             grab.dispose();
             this.grabs.delete(id);
           }
+          for (const [id, watcher] of [...this.copyWatchers]) {
+            if (this.tabs.has(id)) continue;
+            watcher.dispose();
+            this.copyWatchers.delete(id);
+          }
         },
         onActiveState: (state, urlChanged) => {
           if (urlChanged) rememberUrl(state.url);
+          this.ensureCopyWatcher();
           if (Math.abs(state.zoom - this.lastZoom) > 0.001) this.showZoomHud(state.zoom);
           this.lastZoom = state.zoom;
           this.registry?.update();
@@ -1004,6 +1013,21 @@ class Session {
     return tab ? this.grabs.get(tab.id) ?? null : null;
   }
 
+  private ensureCopyWatcher(): void {
+    if (!this.copyOnSelect) return;
+    const tab = this.tabs.active;
+    const handle = tab?.ref.current;
+    if (!tab || !handle || this.copyWatchers.has(tab.id)) return;
+    const watcher = new CopyOnSelect(handle, {
+      copied: (text) => {
+        this.root?.setClipboard(text);
+        this.showToast("copied to clipboard", "done");
+      },
+    });
+    this.copyWatchers.set(tab.id, watcher);
+    void watcher.enable();
+  }
+
   private grabFor(tab: Tab, handle: WebViewHandle): Grab {
     let grab = this.grabs.get(tab.id);
     if (!grab) {
@@ -1391,13 +1415,13 @@ function rememberUrl(url: string) {
   } catch { }
 }
 
-function embeddedAgent(url: string | undefined): EmbeddedAgent | null {
+function embeddedAgent(url: string | undefined, token: string | undefined): EmbeddedAgent | null {
   if (!url) return null;
   return {
     async send(content) {
       const response = await fetch(`${url.replace(/\/$/, "")}/agent-text`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ text: content }),
       });
       return response.ok;

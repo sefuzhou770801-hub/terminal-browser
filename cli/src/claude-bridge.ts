@@ -1,6 +1,7 @@
 import { execFile as execFileCb, spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import net from "node:net";
@@ -85,13 +86,14 @@ async function launch(argv: string[]): Promise<never> {
   if (!tty) report({ error: "no tty: Claude Code is not running on a terminal", code: "tty" }, 2);
   const transport = flag(argv, "--transport") ?? "file"
   const cellOverride = flag(argv, "--cell") ?? process.env.CC_BROWSER_CELL ?? "";
+  const token = crypto.randomBytes(24).toString("hex");
   const socket = path.join(os.tmpdir(), `cc-browser-${process.pid}-${Date.now().toString(36)}.sock`);
   fs.mkdirSync(LOG_DIR, { recursive: true });
   const logFd = fs.openSync(LOG_FILE, "a");
   const [self, ...selfArgs] = selfCommand();
   const child = spawn(
     self,
-    [...selfArgs, "claude-bridge", "serve", "--tty", tty, "--transport", transport, "--socket", socket, "--owner", String(process.ppid), "--cell", cellOverride],
+    [...selfArgs, "claude-bridge", "serve", "--tty", tty, "--transport", transport, "--socket", socket, "--cell", cellOverride, "--token", token],
     { detached: true, stdio: ["ignore", "pipe", logFd] },
   );
   let line = "";
@@ -116,8 +118,8 @@ async function launch(argv: string[]): Promise<never> {
   const { port } = JSON.parse(line.split("\n")[0]) as { port: number };
   child.stdout!.destroy();
   child.unref();
-  const launched = { port, pid: child.pid, tty, transport, terminalBrowser: check.found };
-  fs.appendFileSync(LOG_FILE, `${new Date().toISOString()} launch ${JSON.stringify(launched)}\n`);
+  const launched = { port, pid: child.pid, tty, transport, terminalBrowser: check.found, token };
+  fs.appendFileSync(LOG_FILE, `${new Date().toISOString()} launch ${JSON.stringify({ ...launched, token: undefined })}\n`);
   report(launched);
 }
 
@@ -177,6 +179,7 @@ class Bridge {
     readonly transport: string,
     readonly socketPath: string,
     readonly cellOverride: [number, number] | null,
+    readonly token: string,
   ) {}
 
   state() {
@@ -255,6 +258,7 @@ class Bridge {
         this.title = message.text;
         break;
       case "clipboard":
+        if (DEBUG) log("clipboard from browser", { chars: message.text.length });
         if (process.platform === "darwin") {
           try {
             spawn("pbcopy", { stdio: ["pipe", "ignore", "ignore"] }).stdin!.end(message.text);
@@ -285,7 +289,11 @@ class Bridge {
     delete env.PIXEL_PANE;
     env.PIXEL_EMBED = this.socketPath;
     env.PIXEL_TTY = this.tty;
-    if (this.port) env.TERMINAL_BROWSER_AGENT_BRIDGE = `http://127.0.0.1:${this.port}`;
+    env.TERMINAL_BROWSER_COPY_ON_SELECT = "1";
+    if (this.port) {
+      env.TERMINAL_BROWSER_AGENT_BRIDGE = `http://127.0.0.1:${this.port}`;
+      env.TERMINAL_BROWSER_AGENT_TOKEN = this.token;
+    }
     const [command, ...args] = selfCommand();
     const child = spawn(command, [...args, "open", this.url], { env, stdio: ["ignore", "ignore", "pipe"] });
     let stderr = "";
@@ -471,20 +479,29 @@ function routes(bridge: Bridge): Record<string, (body: unknown) => Reply> {
   };
 }
 
+const IDLE_EXIT_MS = 60_000;
+
 function serve(argv: string[]): void {
   const tty = flag(argv, "--tty");
   const transport = flag(argv, "--transport") ?? "inline";
   const socket = flag(argv, "--socket");
-  const owner = Number(flag(argv, "--owner"));
   const cellOverride = parseCell(flag(argv, "--cell"));
+  const token = flag(argv, "--token") ?? "";
   if (!tty || !socket) {
     process.stderr.write("claude-bridge serve needs --tty and --socket\n");
     process.exit(2);
   }
-  const bridge = new Bridge(tty, transport, socket, cellOverride);
+  const bridge = new Bridge(tty, transport, socket, cellOverride, token);
   bridge.listenForPixel();
   const table = routes(bridge);
+  let lastSeen = Date.now();
   const server = http.createServer(async (request, response) => {
+    if (token && request.headers.authorization !== `Bearer ${token}`) {
+      response.writeHead(401, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "unauthorized" }));
+      return;
+    }
+    lastSeen = Date.now();
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     const handler = table[`${request.method} ${url.pathname}`];
     const [status, value] = handler ? handler(request.method === "POST" ? await readJson(request) : {}) : [404, { error: "not found" }];
@@ -498,15 +515,9 @@ function serve(argv: string[]): void {
     process.stdout.write(JSON.stringify({ port: bridge.port }) + "\n");
   });
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, () => bridge.close());
-  if (owner > 1) {
-    setInterval(() => {
-      try {
-        process.kill(owner, 0);
-      } catch {
-        bridge.close();
-      }
-    }, 5000).unref();
-  }
+  setInterval(() => {
+    if (Date.now() - lastSeen > IDLE_EXIT_MS) bridge.close();
+  }, 10_000).unref();
 }
 
 export async function claudeBridgeCommand(args: string[]): Promise<number> {
