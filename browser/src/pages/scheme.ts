@@ -10,6 +10,9 @@ import type { Theme } from "../ui/theme";
 
 
 export const SCHEME = "terminal-browser";
+// local file previews get their own scheme without fetch/CORS, so a page opened
+// from disk can run its scripts but cannot read other local files
+export const DOC_SCHEME = "terminal-browser-file";
 export const START_URL = `${SCHEME}://start`;
 
 export interface PageContext {
@@ -41,21 +44,29 @@ const CONTENT_TYPES: Record<string, string> = {
 export function registerScheme() {
   protocol.registerSchemesAsPrivileged([
     { scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
+    { scheme: DOC_SCHEME, privileges: { standard: true, secure: true } },
   ]);
 }
 
 export function servePages(context: () => PageContext) {
   protocol.handle(SCHEME, async (request) => {
     const url = new URL(request.url);
-    if (url.host === "file") return serveDocument(decodeURIComponent(url.pathname), context().theme);
     if (url.host === "start") return renderStartPage(url, context());
     return new Response("", { status: 404 });
+  });
+  protocol.handle(DOC_SCHEME, async (request) => {
+    const url = new URL(request.url);
+    return serveDocument(decodeURIComponent(url.pathname), context().theme);
   });
 }
 
 export function documentUrl(file: string): string {
-  return `${SCHEME}://file${file.split(path.sep).map(encodeURIComponent).join("/")}`;
+  return `${DOC_SCHEME}://file${file.split(path.sep).map(encodeURIComponent).join("/")}`;
 }
+
+// a previewed file may embed remote frames but not other local files, so it
+// cannot reach a same-origin local document to read its DOM
+const DOC_CSP = "frame-src https: http: data:; object-src 'none'";
 
 async function serveDocument(file: string, theme: Theme | null): Promise<Response> {
   try {
@@ -63,11 +74,13 @@ async function serveDocument(file: string, theme: Theme | null): Promise<Respons
     if (!stat.isFile()) return new Response("", { status: 404 });
     const body = await fs.promises.readFile(file);
     const extension = path.extname(file).toLowerCase();
+    const headers: Record<string, string> = { "content-security-policy": DOC_CSP };
     if (extension === ".md" || extension === ".markdown") {
-      return html(await renderMarkdown(body.toString("utf8"), path.basename(file), theme));
+      headers["content-type"] = "text/html; charset=utf-8";
+      return new Response(await renderMarkdown(body.toString("utf8"), path.basename(file), theme), { headers });
     }
-    const type = CONTENT_TYPES[extension] ?? "application/octet-stream";
-    return new Response(body, { headers: { "content-type": type } });
+    headers["content-type"] = CONTENT_TYPES[extension] ?? "application/octet-stream";
+    return new Response(body, { headers });
   } catch {
     return new Response("", { status: 404 });
   }

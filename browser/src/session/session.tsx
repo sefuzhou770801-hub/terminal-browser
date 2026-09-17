@@ -96,7 +96,6 @@ export function createSession(ctx: SessionContext): SessionHandle {
   };
 }
 
-const DEFAULT_URL = START_URL;
 
 const FONT_FILE = path.join("fonts", "JetBrainsMono-Regular.ttf");
 
@@ -216,9 +215,11 @@ class Session {
   private readonly agentPanes: AgentPaneFinder;
   private shownRecord: RecordSession | null = null;
   private recordStarting = false;
+  private readonly defaultUrl: string;
 
   constructor(ctx: SessionContext) {
     this.ctx = ctx;
+    this.defaultUrl = ctx.env.TERMINAL_BROWSER_START_PAGE === "1" ? START_URL : "about:blank";
     this.terminal = detect(ctx.env);
     this.marker = `terminal-browser:${ctx.key}`;
     this.argv = ctx.argv;
@@ -278,7 +279,7 @@ class Session {
         },
         requestRender: () => this.render(),
       },
-      DEFAULT_URL,
+      this.defaultUrl,
     );
   }
 
@@ -322,7 +323,7 @@ class Session {
       splitDir: splitDirection(flagValue(this.argv, "--split-dir")),
       parentTty: flagValue(this.argv, "--parent-tty"),
       state: () => this.tabs.activeState ?? this.fallbackState,
-      openTab: (url, cwd) => this.tabs.create(url ? normalizeUrl(url, cwd) : DEFAULT_URL).id,
+      openTab: (url, cwd) => this.tabs.create(url ? normalizeUrl(url, cwd) : this.defaultUrl).id,
       activateTab: (id) => {
         if (!this.tabs.has(id) || this.activeRecord()?.reviewing) return false;
         this.tabs.activate(id);
@@ -1363,7 +1364,7 @@ class Session {
       const last = lastUrl()?.trim();
       if (last && /^https?:\/\//.test(last)) return last;
     } catch { }
-    return DEFAULT_URL;
+    return this.defaultUrl;
   }
 }
 

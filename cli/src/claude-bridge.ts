@@ -290,6 +290,7 @@ class Bridge {
     env.PIXEL_EMBED = this.socketPath;
     env.PIXEL_TTY = this.tty;
     env.TERMINAL_BROWSER_COPY_ON_SELECT = "1";
+    env.TERMINAL_BROWSER_START_PAGE = "1";
     if (this.port) {
       env.TERMINAL_BROWSER_AGENT_BRIDGE = `http://127.0.0.1:${this.port}`;
       env.TERMINAL_BROWSER_AGENT_TOKEN = this.token;

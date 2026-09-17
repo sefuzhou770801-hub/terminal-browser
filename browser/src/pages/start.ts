@@ -139,7 +139,7 @@ function render(data: Awaited<ReturnType<typeof collect>>, theme: Theme | null):
   :root { color-scheme: dark light; }
   html, body { margin: 0; background: transparent; color: ${fg}; }
   body { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 28px 32px; max-width: 720px; }
-  h2 { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: ${muted}; margin: 0 0 6px; }
+  h2 { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: ${muted}; margin: 0 0 6px; }
   section + section { margin-top: 22px; padding-top: 18px; border-top: 1px solid ${hairline}; }
   ul { list-style: none; margin: 0; padding: 0; }
   li { display: flex; justify-content: space-between; gap: 16px; padding: 3px 0; }

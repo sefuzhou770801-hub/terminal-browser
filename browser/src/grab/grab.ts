@@ -45,10 +45,13 @@ const REGISTER_PLUGIN = `(api) => {
 }`;
 
 const COPY_ON_SELECT_BINDING = "__terminalBrowserCopyOnSelect";
+const COPY_ON_SELECT_WORLD_ID = 1013;
+const COPY_ON_SELECT_WORLD = "terminal-browser-copy-on-select";
 
 const COPY_ON_SELECT_WATCHER = `;(() => {
   let last = "";
-  document.addEventListener("mouseup", () => {
+  document.addEventListener("mouseup", (e) => {
+    if (!e.isTrusted) return;
     setTimeout(() => {
       const sel = window.getSelection && window.getSelection();
       const text = sel ? String(sel).trim() : "";
@@ -63,13 +66,18 @@ const COPY_ON_SELECT_WATCHER = `;(() => {
 let preloadFile: string | null = null;
 export function reactGrabPreloadPath(copyOnSelect = false): string {
   if (!preloadFile) {
-    const early = `window.__REACT_GRAB_DISABLED__ = true;\n${reactGrabLibrary()}${copyOnSelect ? `\n${COPY_ON_SELECT_WATCHER}` : ""}`;
+    const early = `window.__REACT_GRAB_DISABLED__ = true;\n${reactGrabLibrary()}`;
+    const copyOnSelectInjection = copyOnSelect
+      ? `
+  webFrame.setIsolatedWorldInfo(${COPY_ON_SELECT_WORLD_ID}, { name: ${JSON.stringify(COPY_ON_SELECT_WORLD)} });
+  void webFrame.executeJavaScriptInIsolatedWorld(${COPY_ON_SELECT_WORLD_ID}, [{ code: ${JSON.stringify(COPY_ON_SELECT_WATCHER)} }]);`
+      : "";
     preloadFile = path.join(app.getPath("userData"), "terminal-browser-react-grab-preload.js");
     fs.writeFileSync(
       preloadFile,
       `if (process.isMainFrame) {
   const { webFrame } = require("electron");
-  void webFrame.executeJavaScript(${JSON.stringify(early)});
+  void webFrame.executeJavaScript(${JSON.stringify(early)});${copyOnSelectInjection}
 }
 `,
     );
@@ -93,7 +101,7 @@ export class CopyOnSelect {
   async enable(): Promise<void> {
     if (this.listening) return;
     this.listening = true;
-    await this.view.cdp("Runtime.addBinding", { name: COPY_ON_SELECT_BINDING });
+    await this.view.cdp("Runtime.addBinding", { name: COPY_ON_SELECT_BINDING, executionContextName: COPY_ON_SELECT_WORLD });
     this.view.webContents.debugger.on("message", this.onMessage);
   }
 
