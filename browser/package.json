@@ -11,7 +11,7 @@
     "test": "tsc -p tsconfig.json && node --test \"test/*.test.js\""
   },
   "dependencies": {
-    "@zenbu-labs/pixel": "file:../../pixel-cc-embed-gate/packages/pixel",
+    "@zenbu-labs/pixel": "0.0.15",
     "micromark": "^4.0.2",
     "micromark-extension-gfm": "^3.0.0",
     "pixel-store": "workspace:*",
