@@ -4,9 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  '@zenbu-labs/pixel-native-darwin-arm64': file:../pixel-cc-embed-gate/packages/native/darwin-arm64
-
 importers:
 
   .:
@@ -21,8 +18,8 @@ importers:
   browser:
     dependencies:
       '@zenbu-labs/pixel':
-        specifier: file:../../pixel-cc-embed-gate/packages/pixel
-        version: file:../pixel-cc-embed-gate/packages/pixel(react@18.3.1)
+        specifier: 0.0.14
+        version: 0.0.14(react@18.3.1)
       micromark:
         specifier: ^4.0.2
         version: 4.0.2
@@ -55,8 +52,8 @@ importers:
   cli:
     dependencies:
       '@zenbu-labs/pixel':
-        specifier: file:../../pixel-cc-embed-gate/packages/pixel
-        version: file:../pixel-cc-embed-gate/packages/pixel(react@18.3.1)
+        specifier: 0.0.14
+        version: 0.0.14(react@18.3.1)
       pixel-store:
         specifier: workspace:*
         version: link:../store
@@ -584,13 +581,28 @@ packages:
     resolution: {integrity: sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A==}
     engines: {node: '>=14.6'}
 
-  '@zenbu-labs/pixel-native-darwin-arm64@file:../pixel-cc-embed-gate/packages/native/darwin-arm64':
-    resolution: {directory: ../pixel-cc-embed-gate/packages/native/darwin-arm64, type: directory}
+  '@zenbu-labs/pixel-native-darwin-arm64@0.0.14':
+    resolution: {integrity: sha512-8kq3frn2UiIB3D9Ki7TNqT8DXfMP5XOgDj5dqfEMjlAq5WeyaXFJq05Euk50cZljUeR1IrfNHEXRB1B1olCpyg==}
     cpu: [arm64]
     os: [darwin]
 
-  '@zenbu-labs/pixel@file:../pixel-cc-embed-gate/packages/pixel':
-    resolution: {directory: ../pixel-cc-embed-gate/packages/pixel, type: directory}
+  '@zenbu-labs/pixel-native-darwin-x64@0.0.14':
+    resolution: {integrity: sha512-wYDoqXByDx68emrANdTrAJ9P3jopof/90YdCMv/S/gvfHdVJ/t8KXiJNWWSvMS/rjx1YBS2w0M3uHB52ozq1PQ==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@zenbu-labs/pixel-native-linux-arm64@0.0.14':
+    resolution: {integrity: sha512-bwjEqaev0EaNS2/foCRjxPhZKyyAtzBW85AkN7aiG6fgvd8bVamsdHsHgjQNwgGbMTCf3TNh+wj1bn6/rGnK7g==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@zenbu-labs/pixel-native-linux-x64@0.0.14':
+    resolution: {integrity: sha512-x40NLwB8HzBFWrAvLqRlHASAAEzNaS7jOZb9u5cMvnQknJPWCneYhwUGhCDg+lV3memniOsWV2fZqAN9jE2muQ==}
+    cpu: [x64]
+    os: [linux]
+
+  '@zenbu-labs/pixel@0.0.14':
+    resolution: {integrity: sha512-7AXnNgWeGRiBUwOmzPr5yOvENz/Yop3SfjVhdDd1d20XnxfluB7dbNAGVO7fN5kQHiHjcWgtiC2ptAA0arJLZQ==}
     hasBin: true
     peerDependencies:
       react: ^18.3.1
@@ -1444,15 +1456,27 @@ snapshots:
 
   '@xmldom/xmldom@0.9.12': {}
 
-  '@zenbu-labs/pixel-native-darwin-arm64@file:../pixel-cc-embed-gate/packages/native/darwin-arm64':
+  '@zenbu-labs/pixel-native-darwin-arm64@0.0.14':
     optional: true
 
-  '@zenbu-labs/pixel@file:../pixel-cc-embed-gate/packages/pixel(react@18.3.1)':
+  '@zenbu-labs/pixel-native-darwin-x64@0.0.14':
+    optional: true
+
+  '@zenbu-labs/pixel-native-linux-arm64@0.0.14':
+    optional: true
+
+  '@zenbu-labs/pixel-native-linux-x64@0.0.14':
+    optional: true
+
+  '@zenbu-labs/pixel@0.0.14(react@18.3.1)':
     dependencies:
       react: 18.3.1
       react-reconciler: 0.29.2(react@18.3.1)
     optionalDependencies:
-      '@zenbu-labs/pixel-native-darwin-arm64': file:../pixel-cc-embed-gate/packages/native/darwin-arm64
+      '@zenbu-labs/pixel-native-darwin-arm64': 0.0.14
+      '@zenbu-labs/pixel-native-darwin-x64': 0.0.14
+      '@zenbu-labs/pixel-native-linux-arm64': 0.0.14
+      '@zenbu-labs/pixel-native-linux-x64': 0.0.14
 
   agent-install@0.0.6:
     dependencies:

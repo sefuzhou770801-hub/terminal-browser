@@ -1,3 +1,9 @@
+# terminal-browser claude code plugin
+
+The terminal 
+
+
+
 Caveats:
 - cannot render above 50fps while running inside claude code without risk of screen tearing (possible screen tearing regardless)
 - cannot enable pixel mouse position reporting, so the mouse position will almost always be slightly off, and in some cases making interacting with some elements not possible
