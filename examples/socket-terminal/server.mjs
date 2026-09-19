@@ -74,11 +74,15 @@ const methods = {
       down: (rect) => rect.top === self.bottom + 2,
       up: (rect) => rect.bottom === self.top - 2,
     }[direction];
-    const overlaps = (rect) =>
+    const overlap = (rect) =>
       direction === "right" || direction === "left"
-        ? rect.top <= self.bottom && rect.bottom >= self.top
-        : rect.left <= self.right && rect.right >= self.left;
-    const found = rects.find((rect) => rect.id !== self.id && beside(rect) && overlaps(rect));
+        ? Math.min(rect.bottom, self.bottom) - Math.max(rect.top, self.top)
+        : Math.min(rect.right, self.right) - Math.max(rect.left, self.left);
+    let found = null;
+    for (const rect of rects) {
+      if (rect.id === self.id || !beside(rect) || overlap(rect) < 0) continue;
+      if (!found || overlap(rect) > overlap(found)) found = rect;
+    }
     return { pane: found ? { id: found.id, tab: from.tab } : null };
   },
   async sendText({ pane, text }) {
