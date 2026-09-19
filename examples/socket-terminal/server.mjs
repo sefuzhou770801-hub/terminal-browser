@@ -12,7 +12,7 @@ const exec = promisify(execFile);
 
 const socketPath = process.argv[2];
 if (!socketPath) {
-  process.stderr.write("usage: server.mjs <socket path>\n");
+  process.stderr.write("[placeholder copy: usage: server.mjs <socket path>]\n");
   process.exit(1);
 }
 
@@ -110,7 +110,13 @@ async function answer(line) {
   }
 }
 
-fs.rmSync(socketPath, { force: true });
+if (fs.existsSync(socketPath)) {
+  if (!fs.lstatSync(socketPath).isSocket()) {
+    process.stderr.write(`[placeholder copy: ${socketPath} exists and is not a socket, refusing to replace it]\n`);
+    process.exit(1);
+  }
+  fs.rmSync(socketPath);
+}
 const server = net.createServer((connection) => {
   let buffer = "";
   connection.setEncoding("utf8");
@@ -123,7 +129,10 @@ const server = net.createServer((connection) => {
     connection.end(`${JSON.stringify(reply)}\n`);
   });
 });
-server.listen(socketPath, () => process.stderr.write(`listening on ${socketPath}\n`));
+server.listen(socketPath, () => {
+  fs.chmodSync(socketPath, 0o600);
+  process.stderr.write(`listening on ${socketPath}\n`);
+});
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {
     server.close();
