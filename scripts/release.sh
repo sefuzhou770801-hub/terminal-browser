@@ -52,6 +52,9 @@ cp "$ROOT/assets/fonts/JetBrainsMono-Regular.ttf" "$STAGE/assets/fonts/"
 mkdir -p "$STAGE/assets/react-grab"
 cp "$ROOT/assets/react-grab/"* "$STAGE/assets/react-grab/"
 
+mkdir -p "$STAGE/assets/search"
+cp "$ROOT/assets/search/"* "$STAGE/assets/search/"
+
 ELECTRON_DIST="$(node -e '
   const p = require("path");
   const lib = require.resolve("@zenbu-labs/pixel/package.json", { paths: [process.argv[1]] });

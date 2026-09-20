@@ -87,7 +87,7 @@ async function startBridge($: EngineInterface): Promise<{ ok: true } | { ok: fal
   }
   if (!isLaunchReport(report) || !('port' in report)) {
     const detail = isLaunchReport(report) && 'error' in report ? report.error : 'terminal-browser could not start'
-    return { ok: false, error: `[placeholder copy: ${detail}]` }
+    return { ok: false, error: `${detail}` }
   }
   state.port = report.port
   state.token = report.token

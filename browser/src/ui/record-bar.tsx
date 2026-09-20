@@ -3,7 +3,6 @@ import { Box, Text } from "@zenbu-labs/pixel";
 import type { Rgba } from "@zenbu-labs/pixel";
 import { measureText } from "../record/model";
 import type { InteractionKind, RecordView } from "../record/types";
-import { recordKeyLabel } from "../session/keybindings";
 import { displayUrl } from "../url";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
@@ -808,7 +807,7 @@ export function ReviewToolbar({
       >
         <Icon icon="close" size={rem * 0.95} color={theme.muted} />
         <Text style={{ fontSize: rem * 0.68, color: theme.disabled, wrap: false, selectable: false }}>
-          {recordKeyLabel}
+          {view.recordKey}
         </Text>
       </Box>
       <Box
@@ -905,7 +904,7 @@ export function RecordToolbarPill({
           selectable: false,
         }}
       >
-        {stopped ? "ctrl+enter" : recordKeyLabel}
+        {stopped ? "ctrl+enter" : view.recordKey}
       </Text>
     </Box>
   );

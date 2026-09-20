@@ -14,6 +14,7 @@ function base(variable: string, fallback: string): string {
 const DATA_HOME = base("XDG_DATA_HOME", ".local/share");
 const STATE_HOME = base("XDG_STATE_HOME", ".local/state");
 const CACHE_HOME = base("XDG_CACHE_HOME", ".cache");
+const CONFIG_HOME = base("XDG_CONFIG_HOME", ".config");
 
 const RUNTIME_HOME = process.env.XDG_RUNTIME_DIR ?? STATE_HOME;
 
@@ -51,6 +52,15 @@ export const INSTANCES_DIR = path.join(RUNTIME_HOME, APP_DIR_NAME, "instances");
 export const AGENT_SOCKETS_DIR = path.join(RUNTIME_HOME, APP_DIR_NAME, "agent-browser");
 export const DAEMON_SOCKET = path.join(RUNTIME_HOME, APP_DIR_NAME, "daemon.sock");
 export const DB_FILE = path.join(DATA_DIR, "terminal-browser.db");
+
+function configDir(): string {
+  const override = process.env.TERMINAL_BROWSER_CONFIG_DIR;
+  return override && path.isAbsolute(override) ? override : path.join(CONFIG_HOME, "terminal-browser");
+}
+
+export const CONFIG_DIR = configDir();
+export const SETTINGS_FILE = path.join(CONFIG_DIR, "settings.json");
+export const SHORTCUTS_FILE = path.join(CONFIG_DIR, "shortcuts.json");
 
 export function ensureDataDir(): void {
   fs.mkdirSync(DATA_DIR, { recursive: true });

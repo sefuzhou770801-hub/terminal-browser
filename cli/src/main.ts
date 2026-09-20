@@ -475,10 +475,6 @@ async function requireGraphics(check: TerminalCheck) {
 const BROWSER_FLAGS = [
   "--allow-clipboard-read",
   "--ssh=",
-  "--palette-key=",
-  "--find-key=",
-  "--devtools-key=",
-  "--console-key=",
   "--split-dir=",
   "--parent-tty=",
 ];

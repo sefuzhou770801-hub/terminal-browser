@@ -19,10 +19,23 @@ import { bundledAsset } from "../assets";
 import { CopyOnSelect, Grab, reactGrabPreloadPath } from "../grab/grab";
 import { AgentPaneFinder } from "../grab/target";
 import type { EmbeddedAgent } from "../grab/target";
-import { zoomDirection } from "../zoom";
 import type { ZoomDirection } from "../zoom";
-import { TERMINAL_SOCKET_ENV, lastUrl, listApps, setLastUrl, settings, socketTerminal, store } from "pixel-store";
+import {
+  SHORTCUTS_FILE,
+  SETTINGS_FILE,
+  TERMINAL_SOCKET_ENV,
+  lastUrl,
+  listApps,
+  setLastUrl,
+  settings as settingsTable,
+  socketTerminal,
+  store,
+} from "pixel-store";
 import type { InstanceRow, RegisteredApp } from "pixel-store";
+
+import { commandLabel } from "../config/commands";
+import type { CommandId } from "../config/commands";
+import { listStep } from "../config/keys";
 
 import type { RecordTarget } from "../record/recorder";
 import { RecordSession } from "../record/session";
@@ -41,25 +54,16 @@ import type {
   TabActions,
   TabView,
 } from "../ui/types";
-import { displayUrl, normalizeUrl, searchOrUrl } from "../url";
+import { displayUrl, normalizeUrl, searchOrUrl, searchUrlFor } from "../url";
+import type { SearchUrl } from "../url";
 import { START_URL } from "../pages/scheme";
 import type { PageContext } from "../pages/scheme";
 import { makeTheme } from "../ui/theme";
 import { fuzzyScore } from "./fuzzy";
-import {
-  bindingLabel,
-  defaultKeys,
-  grabKeyLabel,
-  isGrabKey,
-  isRecordKey,
-  listStep,
-  matchesBinding,
-  parseKeyBindings,
-  recordKeyLabel,
-} from "./keybindings";
-import type { KeyBinding } from "./keybindings";
 import { clampDevtoolsFraction, computeLayout, dividerFraction, recordBarHeight } from "./layout";
 import type { DevtoolsPlacement, SurfaceLayout } from "./layout";
+import { SUGGESTIONS_OFF } from "../config/search";
+import { SettingsManager } from "./settings";
 import { fetchSuggestions } from "./suggest";
 import { TabManager } from "./tabs";
 import type { Tab } from "./tabs";
@@ -158,15 +162,20 @@ class Session {
   private readonly sessionFlags: {
     clipboardRead: boolean;
   };
-  private paletteApps: RegisteredApp[] = [];
   private readonly partition: string | null;
   private readonly socksPort: number | null;
   private readonly browserPreload: string;
-  private paletteBinding: KeyBinding[] = [];
-  private findBinding: KeyBinding[] = [];
-  private devtoolsBinding: KeyBinding[] = [];
-  private consoleBinding: KeyBinding[] = [];
-  private noSuper = false;
+  private readonly settings = new SettingsManager(
+    {
+      requestRender: () => this.render(),
+      toast: (text, state) => this.showToast(text, state),
+      setClipboard: (text) => this.root?.setClipboard(text),
+      openUrl: (url) => this.tabs.create(url),
+      overlayOpened: () => this.enterOverlay([]),
+      overlayClosed: () => this.leaveOverlay(),
+    },
+    { settings: SETTINGS_FILE, shortcuts: SHORTCUTS_FILE },
+  );
   private readonly tabs: TabManager;
   private readonly fallbackState: WebViewState;
 
@@ -313,7 +322,8 @@ class Session {
       onExit: (code) => this.ctx.onClose(code),
     });
     this.fontId = await this.root.registerFont(bundledFontPath());
-    this.applyKeyBindings(this.root.info.kittyKeyboard);
+    this.settings.setNoSuper(!this.root.info.kittyKeyboard);
+    this.settings.watch();
     this.recalculateLayout();
     this.root.setPointerShape("default");
     this.tabs.create(this.fallbackState.url);
@@ -331,7 +341,8 @@ class Session {
       splitDir: splitDirection(flagValue(this.argv, "--split-dir")),
       parentTty: flagValue(this.argv, "--parent-tty"),
       state: () => this.tabs.activeState ?? this.fallbackState,
-      openTab: (url, cwd) => this.tabs.create(url ? normalizeUrl(url, cwd) : this.defaultUrl).id,
+      openTab: (url, cwd) =>
+        this.tabs.create(url ? normalizeUrl(url, cwd, this.searchUrl()) : this.defaultUrl).id,
       activateTab: (id) => {
         if (!this.tabs.has(id) || this.activeRecord()?.reviewing) return false;
         this.tabs.activate(id);
@@ -368,22 +379,12 @@ class Session {
     return this.finding;
   }
 
-  private applyKeyBindings(kittyKeyboard: boolean) {
-    this.noSuper = !kittyKeyboard;
-    const binding = (flag: string, fallback: string) =>
-      parseKeyBindings(flagValue(this.argv, flag) ?? defaultBinding(fallback, this.noSuper));
-    this.paletteBinding = binding("--palette-key", defaultKeys.palette);
-    this.findBinding = binding("--find-key", defaultKeys.find);
-    this.devtoolsBinding = binding("--devtools-key", defaultKeys.devtools);
-    this.consoleBinding = binding("--console-key", defaultKeys.console);
+  private get keymap() {
+    return this.settings.keymap;
   }
 
-  private cmdHeld(event: EngineKeyEvent): boolean {
-    return event.mods.super || (this.noSuper && event.mods.alt);
-  }
-
-  private accelHeld(event: EngineKeyEvent): boolean {
-    return this.cmdHeld(event) || (process.platform === "linux" && event.mods.ctrl);
+  private searchUrl(): SearchUrl {
+    return searchUrlFor(this.settings.get("search.engine"));
   }
 
   private closeOrShutdown(id: number) {
@@ -391,8 +392,6 @@ class Session {
     else this.tabs.close(id);
   }
 
-  // What another pixel app shows on this browser's tab when the
-  // browser is a guest in its pane.
   private syncTitle() {
     const state = this.tabs.activeState;
     this.root?.setTitle(state ? state.title || displayUrl(state.url) : "");
@@ -406,6 +405,7 @@ class Session {
     this.shownRecord = null;
     this.registry?.dispose();
     this.registry = null;
+    this.settings.dispose();
     this.tabs.stopAll();
     if (this.root) this.root.stop(code);
     else this.ctx.onClose(code);
@@ -415,8 +415,6 @@ class Session {
     this.root?.nudgeResize();
   }
 
-  // The app is started on this browser's tty, so if it is a pixel
-  // app it joins this pane as a tab rather than opening one of its own.
   private launchApp(app: RegisteredApp) {
     const env = { ...this.ctx.env };
     if (this.registry) env.TERMINAL_BROWSER_INTEROP_TARGET = this.registry.socketPath;
@@ -499,6 +497,7 @@ class Session {
             : null
         }
         pageMenu={this.pageMenuView()}
+        settings={this.settings.view()}
         dividerEngaged={this.dividerHover || this.dividerDragging}
         record={this.activeRecord()?.view() ?? null}
         recordSurface={this.activeRecord()?.surface ?? null}
@@ -581,8 +580,25 @@ class Session {
     },
     pageMenuAction: (id) => this.runPageMenu(id),
     pageMenuClose: () => this.closePageMenu(),
+    settings: this.settings.actions,
     record: this.recordActions(),
   };
+
+  private openSettings() {
+    if (this.palette || this.newTab || this.urlEditOpen) return;
+    this.closePageMenu();
+    this.settings.open();
+  }
+
+  private enterOverlay(captureKeys: string[]) {
+    this.blurToOverlay();
+    this.root?.setKeyCapture(captureKeys);
+  }
+
+  private leaveOverlay() {
+    this.root?.setKeyCapture(this.findOpen ? ["enter"] : []);
+    this.refocusPage();
+  }
 
   /** the record session lives with its tab; the active tab's session gets the UI and input */
   private activeRecord(): RecordSession | null {
@@ -671,6 +687,8 @@ class Session {
             if (this.shownRecord?.target.tabId === tab.id) this.shownRecord = null;
             this.syncRecordLayout();
           },
+          isRecordKey: (event) => this.keymap.match(event) === "record.toggle",
+          recordKeyLabel: () => this.keymap.label("record.toggle"),
         },
         this.recordTarget(tab),
       );
@@ -689,13 +707,20 @@ class Session {
     this.render();
   }
 
-  // Returns true when the browser consumed the key; anything else reaches the
-  // focused page through pixel.
   private handleKey(event: EngineKeyEvent): boolean {
     const handle = this.tabs.activeHandle;
     if (event.kind === "release") return false;
-    const quitKey = event.key === "q" || (process.platform === "darwin" && event.key === "c");
-    if (event.mods.ctrl && quitKey) {
+    if (this.settings.recording) {
+      this.settings.recordKey(event);
+      return true;
+    }
+    const devSocket = this.ctx.env.TERMINAL_BROWSER_DEV_SOCKET;
+    if (devSocket && event.mods.ctrl && event.mods.shift && event.key === "r") {
+      this.requestDevReload(devSocket);
+      return true;
+    }
+    const command = this.keymap.match(event);
+    if (command === "quit") {
       this.shutdown();
       return true;
     }
@@ -707,9 +732,13 @@ class Session {
       this.closePageMenu();
       if (event.key === "escape") return true;
     }
+    if (this.settings.isOpen) {
+      if (event.key === "escape" || command === "settings.open") this.settings.close();
+      return true;
+    }
     if (this.palette) {
       const step = listStep(event);
-      if (event.key === "escape" || matchesBinding(event, this.paletteBinding)) {
+      if (event.key === "escape" || command === "palette") {
         this.closePalette();
       } else if (step) {
         const count = this.filteredPalette().length;
@@ -748,40 +777,6 @@ class Session {
       return true;
     }
     if (!this.findOpen && this.activeRecord()?.handleKey(event)) return true;
-    {
-      if (isRecordKey(event)) {
-        if (!this.activeRecord()) void this.startRecording();
-        return true;
-      }
-      if (isGrabKey(event)) {
-        void this.toggleGrab();
-        return true;
-      }
-      if ((this.cmdHeld(event) || event.mods.ctrl) && event.key === "t") {
-        if (!this.activeRecord()?.reviewing) this.openNewTabModal();
-        return true;
-      }
-      if (matchesBinding(event, this.paletteBinding)) {
-        this.openPalette();
-        return true;
-      }
-      if (this.accelHeld(event) && event.key === "l") {
-        this.openUrlEdit();
-        return true;
-      }
-      if (matchesBinding(event, this.findBinding)) {
-        this.openFind();
-        return true;
-      }
-      if (matchesBinding(event, this.devtoolsBinding) || isPlainKey(event, "f12")) {
-        this.toggleDevtools();
-        return true;
-      }
-      if (matchesBinding(event, this.consoleBinding)) {
-        this.toggleDevtoolsConsole();
-        return true;
-      }
-    }
     if (event.key === "escape" && this.findOpen) {
       this.closeFind();
       return true;
@@ -790,31 +785,84 @@ class Session {
       handle?.findNext(!event.mods.shift);
       return true;
     }
-    {
-      if (this.accelHeld(event) && event.key === "r") {
-        this.activeRecord()?.reloaded();
-        handle?.reload();
-        return true;
-      }
-      if ((this.accelHeld(event) || event.mods.ctrl) && event.key === "[") {
-        handle?.back();
-        return true;
-      }
-      if ((this.accelHeld(event) || event.mods.ctrl) && event.key === "]") {
-        handle?.forward();
-        return true;
-      }
-      if (this.cmdHeld(event) || event.mods.ctrl) {
-        const direction = zoomDirection(event.key);
-        if (direction !== null) {
-          const shifted = event.mods.shift || event.key === "+" || event.key === "_";
-          if (shifted) this.zoomUi(direction);
-          else this.applyZoom(direction);
-          return true;
-        }
-      }
+    if (command) {
+      this.runCommand(command);
+      return true;
     }
     return false;
+  }
+
+  private runCommand(id: CommandId) {
+    const handle = this.tabs.activeHandle;
+    switch (id) {
+      case "quit":
+        this.shutdown();
+        return;
+      case "palette":
+        this.openPalette();
+        return;
+      case "settings.open":
+        this.openSettings();
+        return;
+      case "tab.new":
+        if (!this.activeRecord()?.reviewing) this.openNewTabModal();
+        return;
+      case "tab.close": {
+        const tab = this.tabs.active;
+        if (tab && !this.activeRecord()?.reviewing) this.closeOrShutdown(tab.id);
+        return;
+      }
+      case "url.edit":
+        this.openUrlEdit();
+        return;
+      case "find":
+        this.openFind();
+        return;
+      case "page.reload":
+        this.activeRecord()?.reloaded();
+        handle?.reload();
+        return;
+      case "page.back":
+        handle?.back();
+        return;
+      case "page.forward":
+        handle?.forward();
+        return;
+      case "devtools.toggle":
+        this.toggleDevtools();
+        return;
+      case "devtools.console":
+        this.toggleDevtoolsConsole();
+        return;
+      case "record.toggle": {
+        const record = this.activeRecord();
+        if (!record) void this.startRecording();
+        else if (record.reviewing) record.actions.complete();
+        else record.actions.stop();
+        return;
+      }
+      case "grab.toggle":
+        void this.toggleGrab();
+        return;
+      case "zoom.in":
+        this.applyZoom(1);
+        return;
+      case "zoom.out":
+        this.applyZoom(-1);
+        return;
+      case "zoom.reset":
+        this.applyZoom(0);
+        return;
+      case "ui.zoom.in":
+        this.zoomUi(1);
+        return;
+      case "ui.zoom.out":
+        this.zoomUi(-1);
+        return;
+      case "ui.zoom.reset":
+        this.zoomUi(0);
+        return;
+    }
   }
 
   private applyZoom(direction: ZoomDirection) {
@@ -926,7 +974,7 @@ class Session {
 
   private async loadDevtoolsSettings() {
     try {
-      const [row] = await store().db.select().from(settings);
+      const [row] = await store().db.select().from(settingsTable);
       if (!row) return;
       this.devtoolsDockSide = row.devtoolsDock;
       this.devtoolsFraction = clampDevtoolsFraction(row.devtoolsFraction);
@@ -940,15 +988,15 @@ class Session {
       devtoolsFraction: this.devtoolsFraction,
     };
     void store()
-      .db.insert(settings)
+      .db.insert(settingsTable)
       .values(row)
-      .onConflictDoUpdate({ target: settings.id, set: row })
+      .onConflictDoUpdate({ target: settingsTable.id, set: row })
       .catch(() => { });
   }
 
   private openPageMenu(params: Electron.ContextMenuParams) {
     if (!this.surfaceLayout) return;
-    if (this.palette || this.newTab || this.urlEditOpen) return;
+    if (this.palette || this.newTab || this.urlEditOpen || this.settings.isOpen) return;
     const scale = this.surfaceLayout.scale;
     this.pageMenu = {
       kind: "page",
@@ -973,7 +1021,7 @@ class Session {
       this.closePageMenu();
       return;
     }
-    if (this.palette || this.newTab || this.urlEditOpen) return;
+    if (this.palette || this.newTab || this.urlEditOpen || this.settings.isOpen) return;
     this.pageMenu = { kind: "toolbar" };
     this.render();
   }
@@ -985,6 +1033,9 @@ class Session {
     const handle = tab?.ref.current;
     if (!menu || !tab || !handle) return;
     switch (id) {
+      case "settings":
+        this.openSettings();
+        return;
       case "grab":
         void this.toggleGrab();
         return;
@@ -1084,7 +1135,7 @@ class Session {
       id: "grab",
       label: this.activeGrab()?.active ? "stop selection" : "send to agent",
       enabled: true,
-      shortcut: grabKeyLabel,
+      shortcut: this.keymap.label("grab.toggle"),
       icon: this.grabIcon ? { kind: "image", src: this.grabIcon } : undefined,
     };
   }
@@ -1096,14 +1147,27 @@ class Session {
         id: "record",
         label: this.activeRecord() ? "complete recording" : "record",
         enabled: true,
-        shortcut: this.activeRecord() ? "" : recordKeyLabel,
+        shortcut: this.activeRecord() ? "" : this.keymap.label("record.toggle"),
         icon: { kind: "path", d: ICONS.record, tint: "red", weight: 4.5 },
       },
       {
         id: "inspect",
         label: "inspect",
         enabled: true,
-        shortcut: bindingLabel(this.devtoolsBinding),
+        shortcut: this.keymap.label("devtools.toggle"),
+      },
+    ];
+  }
+
+  private toolbarMenuItems(): PageMenuItem[] {
+    return [
+      ...this.toolMenuItems(),
+      {
+        id: "settings",
+        label: commandLabel("settings.open"),
+        enabled: true,
+        shortcut: this.keymap.label("settings.open"),
+        icon: { kind: "path", d: ICONS.settings },
       },
     ];
   }
@@ -1111,7 +1175,7 @@ class Session {
   private pageMenuView(): PageMenuView | null {
     if (!this.pageMenu || !this.layout) return null;
     if (this.pageMenu.kind === "toolbar") {
-      return { x: this.layout.width, y: this.layout.toolbarHeight, items: this.toolMenuItems() };
+      return { x: this.layout.width, y: this.layout.toolbarHeight, items: this.toolbarMenuItems() };
     }
     const items: PageMenuItem[] = [
       ...(this.pageMenu.selectionText
@@ -1207,7 +1271,7 @@ class Session {
     session.appMatches = matchApps(session.apps, text);
     if (session.timer) clearTimeout(session.timer);
     session.timer = null;
-    if (!text.trim()) {
+    if (!text.trim() || this.settings.get("search.suggestions") === SUGGESTIONS_OFF) {
       session.seq++;
       session.suggestions = [];
       this.render();
@@ -1221,7 +1285,7 @@ class Session {
     const session = this.newTab;
     if (!session) return;
     const seq = ++session.seq;
-    fetchSuggestions(query)
+    fetchSuggestions(this.settings.get("search.suggestions"), query)
       .then((suggestions) => {
         if (this.newTab !== session || session.seq !== seq) return;
         session.suggestions = suggestions;
@@ -1250,18 +1314,15 @@ class Session {
 
   private openPalette() {
     if (this.palette) return;
-    this.paletteApps = safeListApps();
     this.palette = { query: "", index: 0 };
-    this.blurToOverlay();
-    this.root?.setKeyCapture(["enter", "up", "down"]);
+    this.enterOverlay(["enter", "up", "down"]);
     this.render();
   }
 
   private closePalette() {
     if (!this.palette) return;
     this.palette = null;
-    this.root?.setKeyCapture(this.findOpen ? ["enter"] : []);
-    this.refocusPage();
+    this.leaveOverlay();
     this.render();
   }
 
@@ -1274,76 +1335,69 @@ class Session {
 
   private paletteActions(): PaletteAction[] {
     const devtoolsOpen = this.tabs.active?.devtools ?? false;
+    const command = (id: CommandId): PaletteAction => ({
+      id,
+      label: this.paletteLabel(id),
+      shortcut: this.paletteShortcut(id),
+      run: () => this.runCommand(id),
+    });
     return [
-      {
-        id: "find",
-        label: "find in page",
-        shortcut: bindingLabel(this.findBinding),
-        run: () => this.openFind(),
-      },
-      {
-        id: "record",
-        label: this.activeRecord()
-          ? this.activeRecord()?.reviewing
-            ? "complete recording"
-            : "stop recording"
-          : "record page",
-        shortcut: this.activeRecord()?.reviewing ? "ctrl+enter" : recordKeyLabel,
-        run: () => {
-          const record = this.activeRecord();
-          if (!record) void this.startRecording();
-          else if (record.reviewing) record.actions.complete();
-          else record.actions.stop();
-        },
-      },
-      {
-        id: "grab",
-        label: this.activeGrab()?.active ? "stop selection" : "send to agent",
-        shortcut: grabKeyLabel,
-        run: () => void this.toggleGrab(),
-      },
-      {
-        id: "devtools",
-        label: devtoolsOpen ? "close devtools" : "open devtools",
-        shortcut: bindingLabel(this.devtoolsBinding),
-        run: () => this.toggleDevtools(),
-      },
+      command("find"),
+      command("record.toggle"),
+      command("grab.toggle"),
+      command("devtools.toggle"),
       ...(devtoolsOpen
         ? [
-          {
-            id: "devtools-dock",
-            label:
-              this.devtoolsDockSide === "bottom"
-                ? "dock devtools right"
-                : "dock devtools bottom",
-            shortcut: "",
-            run: () =>
-              this.setDevtoolsDockSide(this.devtoolsDockSide === "bottom" ? "right" : "bottom"),
-          },
-        ]
+            {
+              id: "devtools-dock",
+              label:
+                this.devtoolsDockSide === "bottom"
+                  ? "dock devtools right"
+                  : "dock devtools bottom",
+              shortcut: "",
+              run: () =>
+                this.setDevtoolsDockSide(this.devtoolsDockSide === "bottom" ? "right" : "bottom"),
+            },
+          ]
         : []),
-      ...this.paletteApps.map((app) => ({
-        id: `app:${app.id}`,
-        label: `open ${app.name}`,
-        shortcut: "",
-        run: () => this.launchApp(app),
-      })),
       ...(this.ctx.env.TERMINAL_BROWSER_DEV_SOCKET
         ? [
           {
             id: "dev-reload",
             label: "reload instance",
-            shortcut: "",
+            shortcut: "ctrl+shift+r",
             run: () => this.requestDevReload(this.ctx.env.TERMINAL_BROWSER_DEV_SOCKET!),
           },
         ]
         : []),
+      command("settings.open"),
     ];
   }
 
   private requestDevReload(socketPath: string) {
     const connection = net.connect(socketPath, () => connection.end("reload\n"));
     connection.on("error", () => {});
+  }
+
+  private paletteLabel(id: CommandId): string {
+    switch (id) {
+      case "record.toggle": {
+        const record = this.activeRecord();
+        if (!record) return "record page";
+        return record.reviewing ? "complete recording" : "stop recording";
+      }
+      case "grab.toggle":
+        return this.activeGrab()?.active ? "stop selection" : "send to agent";
+      case "devtools.toggle":
+        return this.tabs.active?.devtools ? "close devtools" : "open devtools";
+      default:
+        return commandLabel(id);
+    }
+  }
+
+  private paletteShortcut(id: CommandId): string {
+    if (id === "record.toggle" && this.activeRecord()?.reviewing) return "ctrl+enter";
+    return this.keymap.label(id);
   }
 
   private filteredPalette(): PaletteAction[] {
@@ -1373,7 +1427,8 @@ class Session {
   }
 
   private resolveInput(text: string): string {
-    return normalizeUrl(searchOrUrl(text, this.ctx.cwd), this.ctx.cwd);
+    const search = this.searchUrl();
+    return normalizeUrl(searchOrUrl(text, this.ctx.cwd, search), this.ctx.cwd, search);
   }
 
   pageContext(): PageContext {
@@ -1387,7 +1442,7 @@ class Session {
 
   private initialUrl(): string {
     const arg = this.argv.find((argument) => !argument.startsWith("-"));
-    if (arg) return normalizeUrl(arg, this.ctx.cwd);
+    if (arg) return normalizeUrl(arg, this.ctx.cwd, this.searchUrl());
     try {
       const last = lastUrl()?.trim();
       if (last && /^https?:\/\//.test(last)) return last;
@@ -1401,29 +1456,6 @@ interface PaletteAction {
   label: string;
   shortcut: string;
   run(): void;
-}
-
-function isPlainKey(event: EngineKeyEvent, key: string): boolean {
-  return (
-    event.key === key &&
-    !event.mods.super &&
-    !event.mods.ctrl &&
-    !event.mods.alt &&
-    !event.mods.shift
-  );
-}
-
-function defaultBinding(spec: string, noSuper: boolean): string {
-  if (!noSuper) return spec;
-  return spec
-    .split(/\s+/)
-    .map((chord) => {
-      const parts = chord.split("+");
-      const key = parts.pop()!;
-      const mods = [...new Set(parts.map((mod) => (mod === "super" ? "alt" : mod)))];
-      return [...mods, key].join("+");
-    })
-    .join(" ");
 }
 
 function splitDirection(value: string | null): InstanceRow["splitDir"] {

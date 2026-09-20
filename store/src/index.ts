@@ -7,6 +7,9 @@ export {
   AGENT_SOCKETS_DIR,
   DAEMON_SOCKET,
   DB_FILE,
+  CONFIG_DIR,
+  SETTINGS_FILE,
+  SHORTCUTS_FILE,
   ensureDataDir,
 } from "./paths";
 export { openStore, store } from "./client";

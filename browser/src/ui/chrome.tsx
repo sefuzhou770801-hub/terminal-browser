@@ -8,6 +8,7 @@ import { PageContextMenu } from "./context-menu";
 import { MarkupCanvas } from "./markup-canvas";
 import { NewTabCard, PaletteCard, UrlCard } from "./modals";
 import { DownloadHud, FindBar, Toast, ZoomHud } from "./overlays";
+import { SettingsCard } from "./settings";
 import {
   RecordBar,
   RecordCornerButton,
@@ -27,6 +28,7 @@ import type {
   DevtoolsView,
   PageMenuView,
   PaletteView,
+  SettingsView,
   TabActions,
   TabRow,
   TabView,
@@ -47,6 +49,7 @@ export function Chrome({
   download,
   toast,
   pageMenu,
+  settings,
   dividerEngaged,
   record,
   recordSurface,
@@ -68,6 +71,7 @@ export function Chrome({
   download: DownloadView | null;
   toast: { text: string; detail?: string; failed: boolean; alert: boolean } | null;
   pageMenu: PageMenuView | null;
+  settings: SettingsView | null;
   dividerEngaged: boolean;
   record: RecordView | null;
   recordSurface: Surface | null;
@@ -176,6 +180,9 @@ export function Chrome({
       {newTab && <NewTabCard view={newTab} actions={actions} layout={layout} theme={theme} />}
       {urlEdit && <UrlCard state={state} actions={actions} layout={layout} theme={theme} />}
       {palette && <PaletteCard view={palette} actions={actions} layout={layout} theme={theme} />}
+      {settings && (
+        <SettingsCard view={settings} actions={actions.settings} layout={layout} theme={theme} />
+      )}
     </Box>
   );
 }

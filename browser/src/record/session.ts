@@ -34,7 +34,7 @@ import {
   unionRects,
 } from "./model";
 import type { CropScope, HandleId, MarkupObject, Rect, Tool, Vec } from "./model";
-import { isRecordKey, listStep } from "../session/keybindings";
+import { listStep } from "../config/keys";
 import { newRecordingDir } from "./paths";
 import {
   CLICK_PULSE_MS,
@@ -60,6 +60,8 @@ export interface RecordHost {
   setClipboard(text: string): void;
   toast(name: string, state: "done" | "failed", detail?: string): void;
   finished(): void;
+  isRecordKey(event: EngineKeyEvent): boolean;
+  recordKeyLabel(): string;
 }
 
 const IDLE_GAP_MS = 3000;
@@ -301,6 +303,7 @@ export class RecordSession {
       durationMs: duration,
       currentKey: this.scrub == null ? null : this.stateKey(),
       pageUrl: this.host.page().url,
+      recordKey: this.host.recordKeyLabel(),
       shots: this.shotsView(),
       shotThumb: keyframes.length > 0 ? this.thumbSurface : null,
       keyframeCount: keyframes.length,
@@ -365,7 +368,7 @@ export class RecordSession {
   handleKey(event: EngineKeyEvent): boolean {
     if (event.kind === "release") return false;
     if (this.scrub == null) {
-      if (isRecordKey(event) && !this.recorder.stopped) {
+      if (this.host.isRecordKey(event) && !this.recorder.stopped) {
         this.stopReview();
         return true;
       }
@@ -387,7 +390,7 @@ export class RecordSession {
     }
     const cmd = event.mods.super || event.mods.ctrl;
     const plainCtrl = event.mods.ctrl && !event.mods.super && !event.mods.alt;
-    if (isRecordKey(event)) {
+    if (this.host.isRecordKey(event)) {
       this.discard();
       return true;
     }
