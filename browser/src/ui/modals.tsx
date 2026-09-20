@@ -6,7 +6,7 @@ import { Icon } from "./icons";
 import type { Theme } from "./theme";
 import type { ChromeActions, ChromeLayout, NewTabView, PaletteView } from "./types";
 
-function Backdrop({ layout, onClose }: { layout: ChromeLayout; onClose(): void }) {
+export function Backdrop({ layout, onClose }: { layout: ChromeLayout; onClose(): void }) {
   return (
     <Box
       style={{
@@ -54,6 +54,7 @@ function ModalCard({
           border: { width: 1, color: theme.fieldBorder },
           overflow: "hidden",
         }}
+        onClick={() => {}}
       >
         {children}
       </Box>

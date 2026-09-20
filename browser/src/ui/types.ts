@@ -55,6 +55,59 @@ export interface PageMenuView {
   items: PageMenuItem[];
 }
 
+export type SettingsSection = "general" | "shortcuts" | "advanced";
+
+export interface ShortcutRow {
+  id: string;
+  label: string;
+  keys: string[];
+  modified: boolean;
+  conflicts: string[];
+}
+
+export interface SettingChoiceView {
+  value: string;
+  name: string;
+  logo: string | null;
+}
+
+export type SettingRow = {
+  key: string;
+  label: string;
+  hint?: string;
+  link?: string;
+  modified: boolean;
+} & (
+  | { kind: "string"; value: string }
+  | { kind: "choice"; value: string; choices: SettingChoiceView[] }
+);
+
+export interface SettingsView {
+  section: SettingsSection;
+  query: string;
+  recording: { id: string; label: string; keys: string } | null;
+  shortcuts: ShortcutRow[];
+  settings: SettingRow[];
+  files: { settings: string; keybindings: string };
+}
+
+export interface SettingsActions {
+  close(): void;
+  section(section: SettingsSection): void;
+  query(text: string): void;
+  recordShortcut(id: string): void;
+  cancelRecording(): void;
+  resetShortcut(id: string): void;
+  unbindShortcut(id: string): void;
+  set(key: string, value: string): void;
+  draft(key: string, text: string): void;
+  reset(key: string): void;
+  reloadConfig(): void;
+  copyAgentBrief(): void;
+  copyPath(file: "settings" | "keybindings"): void;
+  openLink(url: string): void;
+}
+
 export interface ChromeActions {
   back(): void;
   forward(): void;
@@ -81,6 +134,7 @@ export interface ChromeActions {
   devtoolsDividerHover(hovering: boolean): void;
   pageMenuAction(id: string): void;
   pageMenuClose(): void;
+  settings: SettingsActions;
   record: RecordActions;
 }
 
