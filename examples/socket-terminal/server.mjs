@@ -12,7 +12,7 @@ const exec = promisify(execFile);
 
 const socketPath = process.argv[2];
 if (!socketPath) {
-  process.stderr.write("[placeholder copy: usage: server.mjs <socket path>]\n");
+  process.stderr.write("usage: server.mjs <socket path>]\n");
   process.exit(1);
 }
 
@@ -116,7 +116,7 @@ async function answer(line) {
 
 if (fs.existsSync(socketPath)) {
   if (!fs.lstatSync(socketPath).isSocket()) {
-    process.stderr.write(`[placeholder copy: ${socketPath} exists and is not a socket, refusing to replace it]\n`);
+    process.stderr.write(`${socketPath} exists and is not a socket, refusing to replace it\n`);
     process.exit(1);
   }
   fs.rmSync(socketPath);
