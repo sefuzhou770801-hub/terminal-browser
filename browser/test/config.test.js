@@ -199,7 +199,24 @@ test("search engine catalog templates carry the query slot", () => {
 
 function tempManager() {
   const store = tempStore();
-  const host = { requestRender() {}, toast() {}, overlayOpened() {}, overlayClosed() {} };
+  const host = {
+    requestRender() {},
+    toast() {},
+    overlayOpened() {},
+    overlayClosed() {},
+    setClipboard() {},
+    openUrl() {},
+    about: () => ({ version: "dev", channel: "dev", chromium: "", electron: "", node: "1", pixel: "", target: "t" }),
+    updates: {
+      view: () => null,
+      canCheck: () => false,
+      canMock: () => false,
+      check: async () => {},
+      download: async () => {},
+      requestRestart() {},
+      mockUpdate: async () => {},
+    },
+  };
   return { manager: new SettingsManager(host, store.files), store };
 }
 

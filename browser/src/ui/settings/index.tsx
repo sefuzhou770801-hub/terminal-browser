@@ -8,6 +8,7 @@ import { AgentBriefButton } from "./agent-brief-button";
 import { ShortcutsPane } from "./shortcuts";
 import { GeneralPane } from "./general";
 import { AdvancedPane } from "./advanced";
+import { IconButton } from "./controls";
 
 const SECTIONS: SettingsSection[] = ["general", "shortcuts", "advanced"];
 
@@ -43,7 +44,7 @@ export function SettingsCard({
           },
           width,
           height,
-          flexDirection: "row",
+          flexDirection: "column",
           background: theme.overlay,
           cornerRadius: rem * 0.55,
           border: { width: 1, color: theme.fieldBorder },
@@ -52,6 +53,24 @@ export function SettingsCard({
         onClick={() => {}}
         onWheel={() => {}}
       >
+        <Box
+          style={{
+            height: rem * 2.3,
+            flexShrink: 0,
+            alignItems: "center",
+            padding: { left: rem * 0.6, right: rem * 0.6 },
+            border: { bottom: [1, theme.hairline] },
+          }}
+        >
+          <Box style={{ width: rem * 1.25, flexShrink: 0 }} />
+          <Box style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, justifyContent: "center" }}>
+            <Text style={{ fontSize: rem * 0.88, wrap: false, ellipsis: true, selectable: false }}>
+              {copy.title(view.about.version)}
+            </Text>
+          </Box>
+          <IconButton icon="close" rem={rem} theme={theme} onClick={actions.close} />
+        </Box>
+        <Box style={{ flexGrow: 1, flexBasis: 0, flexDirection: "row" }}>
         <Box
           style={{
             width: rem * 9,
@@ -98,6 +117,7 @@ export function SettingsCard({
           ) : (
             <GeneralPane view={view} actions={actions} rem={rem} theme={theme} />
           )}
+        </Box>
         </Box>
       </Box>
       {view.recording && (

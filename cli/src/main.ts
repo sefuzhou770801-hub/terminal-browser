@@ -5,7 +5,6 @@ import net from "node:net";
 import path from "node:path";
 
 import {
-  DAEMON_SOCKET,
   LOGS_DIR,
   TERMINAL_SOCKET_ENV,
   appId,
@@ -39,10 +38,20 @@ import { instances } from "./registry";
 import { apparmorSetup, deniedRefusal, linuxSandboxError, sandboxRefusal } from "./sandbox";
 import { connectSsh, validateSshTarget } from "@zenbu-labs/pixel/ssh";
 import type { InstanceRecord } from "./registry";
-import { installedVersion, upgradeCommand } from "./upgrade";
+import { upgradeCommand } from "./upgrade";
 import { claudeBridgeCommand } from "./claude-bridge";
+import { connectDaemon, nextReply } from "./daemon-client";
+import type { DaemonReply } from "./daemon-client";
+import { currentDistRoot, installedVersion } from "pixel-store";
 
 const DIST_ROOT = process.env.TERMINAL_BROWSER_DIST_ROOT ?? null;
+
+// a brew upgrade replaces the Caskroom dir this process was launched from;
+// re-resolve so respawns after a restart use the tree that exists now
+function distRootNow(): string | null {
+  if (!DIST_ROOT) return null;
+  return currentDistRoot() ?? DIST_ROOT;
+}
 const CAPABILITIES = ["embedding"] as const;
 delete process.env.ELECTRON_RUN_AS_NODE;
 
@@ -83,11 +92,13 @@ const ELECTRON_DEV_BIN =
     : ["pixel"];
 
 function browserDirectory(): string {
-  return path.resolve(__dirname, "..", "..", "browser");
+  const root = distRootNow();
+  return root ? path.join(root, "browser") : path.resolve(__dirname, "..", "..", "browser");
 }
 
 function electronBinary(): string {
-  if (DIST_ROOT) return path.join(DIST_ROOT, "electron", ...ELECTRON_DIST_BIN);
+  const root = distRootNow();
+  if (root) return path.join(root, "electron", ...ELECTRON_DIST_BIN);
   const library = require.resolve("@zenbu-labs/pixel/package.json", { paths: [browserDirectory()] });
   return path.join(path.dirname(library), "electron", "dist", ...ELECTRON_DEV_BIN);
 }
@@ -125,8 +136,9 @@ function browserLaunchCommand(argv: string[]): { command: string[]; cwd: string 
 }
 
 function clientLaunchCommand(argv: string[]): string[] {
-  const runner = DIST_ROOT
-    ? [path.join(DIST_ROOT, "bin", "terminal-browser")]
+  const root = distRootNow();
+  const runner = root
+    ? [path.join(root, "bin", "terminal-browser")]
     : [process.execPath, path.resolve(__dirname, "main.js")];
   return [...runner, "open", ...argv];
 }
@@ -149,7 +161,7 @@ function interactiveTty(): string | null {
 }
 
 function browserBuildStamp(): string {
-  const main = path.resolve(__dirname, "..", "..", "browser", "dist", "main.js");
+  const main = path.join(browserDirectory(), "dist", "main.js");
   try {
     return String(Math.floor(fs.statSync(main).mtimeMs));
   } catch {
@@ -157,19 +169,13 @@ function browserBuildStamp(): string {
   }
 }
 
-function connectDaemon(): Promise<net.Socket> {
-  return new Promise((resolve, reject) => {
-    const socket = net.connect(DAEMON_SOCKET);
-    socket.once("connect", () => resolve(socket));
-    socket.once("error", reject);
-  });
-}
-
 function spawnDaemon() {
   const { command, cwd } = browserLaunchCommand(["--daemon"]);
   const env = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !key.startsWith("PIXEL_")),
   );
+  const root = distRootNow();
+  if (root && root !== DIST_ROOT) env.TERMINAL_BROWSER_DIST_ROOT = root;
   const child = spawn(command[0], command.slice(1), { cwd, detached: true, stdio: "ignore", env });
   child.unref();
 }
@@ -190,39 +196,18 @@ async function daemonSocket(): Promise<net.Socket> {
   throw new Error("daemon did not start");
 }
 
-interface DaemonReply {
-  ok?: boolean;
-  error?: string;
-  session?: string;
-  event?: string;
-  code?: number;
-  sessions?: number;
-}
-
-function nextReply(socket: net.Socket, onLine: (reply: DaemonReply) => void): void {
-  let buffer = "";
-  socket.on("data", (chunk) => {
-    buffer += chunk.toString("utf8");
-    let newline = buffer.indexOf("\n");
-    while (newline !== -1) {
-      const line = buffer.slice(0, newline);
-      buffer = buffer.slice(newline + 1);
-      newline = buffer.indexOf("\n");
-      try {
-        onLine(JSON.parse(line) as DaemonReply);
-      } catch {}
-    }
-  });
-}
-
-
-async function openSession(argv: string[], tty: string): Promise<{ socket: net.Socket; reply: DaemonReply }> {
+async function openSession(
+  argv: string[],
+  tty: string,
+  restore: boolean,
+): Promise<{ socket: net.Socket; reply: DaemonReply }> {
   const payload = {
     cmd: "open",
     tty,
     argv,
     env: process.env,
     cwd: process.cwd(),
+    ...(restore ? { restore: true } : {}),
   };
   const ask = (socket: net.Socket, build: string | null) =>
     new Promise<DaemonReply>((resolve, reject) => {
@@ -321,33 +306,59 @@ async function kill(pid: number, why: string): Promise<number> {
 async function attachHere(argv: string[]): Promise<never> {
   const tty = process.env.PIXEL_TTY ?? ownTtyPath();
   if (!tty) throw new Error("not running on a tty");
-  const { socket, reply } = await openSession(argv, tty);
-  if (reply.ok === false || !reply.session) {
-    socket.destroy();
-    throw new Error(reply.error ?? "daemon refused the session");
-  }
-  nextReply(socket, (message) => {
-    if (message.event === "closed") process.exit(message.code ?? 0);
-  });
-  socket.on("close", () => process.exit(0));
-  socket.on("error", () => process.exit(1));
-  process.on("SIGWINCH", () => {
-    try {
-      socket.write('{"cmd":"resize"}\n');
-    } catch {}
-  });
-  const requestClose = () => {
-    try {
-      socket.write('{"cmd":"close"}\n');
-    } catch {
-      process.exit(0);
+  let restore = false;
+  for (;;) {
+    const { socket, reply } = await openSession(argv, tty, restore);
+    if (reply.ok === false || !reply.session) {
+      socket.destroy();
+      throw new Error(reply.error ?? "daemon refused the session");
     }
-    setTimeout(() => process.exit(0), 2000);
-  };
-  process.on("SIGINT", requestClose);
-  process.on("SIGTERM", requestClose);
-  process.on("SIGHUP", requestClose);
-  return new Promise<never>(() => {});
+    const outcome = await runAttachedSession(socket);
+    if (outcome !== "restarting") process.exit(outcome);
+    // the daemon swapped itself out for an update; reconnect to the fresh one with our tabs
+    restore = true;
+    await sleep(700 + Math.floor(Math.random() * 300));
+  }
+}
+
+function runAttachedSession(socket: net.Socket): Promise<number | "restarting"> {
+  return new Promise((resolve) => {
+    let restarting = false;
+    let settled = false;
+    const onResize = () => {
+      try {
+        socket.write('{"cmd":"resize"}\n');
+      } catch {}
+    };
+    const done = (value: number | "restarting") => {
+      if (settled) return;
+      settled = true;
+      process.off("SIGWINCH", onResize);
+      process.off("SIGINT", requestClose);
+      process.off("SIGTERM", requestClose);
+      process.off("SIGHUP", requestClose);
+      socket.destroy();
+      resolve(value);
+    };
+    const requestClose = () => {
+      try {
+        socket.write('{"cmd":"close"}\n');
+      } catch {
+        done(0);
+      }
+      setTimeout(() => done(0), 2000);
+    };
+    nextReply(socket, (message) => {
+      if (message.event === "restarting") restarting = true;
+      if (message.event === "closed" && !restarting) done(message.code ?? 0);
+    });
+    socket.on("close", () => done(restarting ? "restarting" : 0));
+    socket.on("error", () => done(restarting ? "restarting" : 1));
+    process.on("SIGWINCH", onResize);
+    process.on("SIGINT", requestClose);
+    process.on("SIGTERM", requestClose);
+    process.on("SIGHUP", requestClose);
+  });
 }
 
 async function openHere(argv: string[]): Promise<never> {

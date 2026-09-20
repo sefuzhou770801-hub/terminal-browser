@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { store } from "./client";
 
 // why are we using raw sql here?
@@ -22,4 +24,23 @@ export function lastUrl(): string | null {
 
 export function setLastUrl(url: string): void {
   setAppState("last-url", url);
+}
+
+const updateCheckSchema = z.object({ at: z.number(), version: z.string() });
+
+export type UpdateCheck = z.infer<typeof updateCheckSchema>;
+
+export function updateCheck(): UpdateCheck | null {
+  const raw = getAppState("update-check");
+  if (!raw) return null;
+  try {
+    const parsed = updateCheckSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setUpdateCheck(check: UpdateCheck): void {
+  setAppState("update-check", JSON.stringify(check));
 }

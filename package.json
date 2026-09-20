@@ -6,7 +6,7 @@
     "browser": "node scripts/dev.mjs",
     "types": "scripts/plugin-types.sh",
     "postinstall": "scripts/plugin-types.sh --if-missing",
-    "build:dist": "scripts/release.sh \"local-$(git rev-parse --short HEAD)\"",
+    "build:dist": "scripts/release.sh \"local-$(git rev-parse --short HEAD)\" local",
     "install:dist": "scripts/install-local.sh",
     "dist": "pnpm build:dist && pnpm install:dist",
     "release:patch": "scripts/tag-release.sh patch",

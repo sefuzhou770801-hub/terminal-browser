@@ -12,7 +12,7 @@ import { z } from "zod";
 
 import { callerTty } from "@zenbu-labs/pixel/terminal";
 
-import { installedVersion } from "./upgrade";
+import { installedVersion } from "pixel-store";
 
 const execFile = promisify(execFileCb);
 

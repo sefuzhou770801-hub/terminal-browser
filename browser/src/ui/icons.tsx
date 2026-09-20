@@ -1,7 +1,7 @@
 import { Path } from "@zenbu-labs/pixel";
 import type { Rgba } from "@zenbu-labs/pixel";
 
-function arcPath(cx: number, cy: number, r: number, fromDeg: number, toDeg: number): string {
+export function arcPath(cx: number, cy: number, r: number, fromDeg: number, toDeg: number): string {
   const rad = (deg: number) => (deg * Math.PI) / 180;
   const segments = Math.max(1, Math.ceil(Math.abs(toDeg - fromDeg) / 90));
   const step = (rad(toDeg) - rad(fromDeg)) / segments;

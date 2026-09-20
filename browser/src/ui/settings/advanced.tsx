@@ -3,7 +3,9 @@ import type { Theme } from "../theme";
 import type { SettingsActions, SettingsView } from "../types";
 import { copy } from "./copy";
 import { ScrollPane } from "./scroll-pane";
+import { AboutBlock } from "./about";
 import { TextButton } from "./controls";
+import { Divider } from "./divider";
 import { CopyIcon, useCopiedFlash } from "./copied";
 
 export function AdvancedPane({
@@ -18,35 +20,46 @@ export function AdvancedPane({
   theme: Theme;
 }) {
   return (
-    <ScrollPane
-      rem={rem}
-      resetKey={0}
-      style={{
-        flexGrow: 1,
-        flexBasis: 0,
-        flexDirection: "column",
-        gap: rem * 0.8,
-        padding: { top: rem * 0.9, bottom: rem * 0.8, left: rem * 1, right: rem * 1 },
-      }}
-    >
-      <PathLine
-        header={copy.files.settings}
-        path={view.files.settings}
+    <>
+      <ScrollPane
         rem={rem}
-        theme={theme}
-        onCopy={() => actions.copyPath("settings")}
-      />
-      <PathLine
-        header={copy.files.keybindings}
-        path={view.files.keybindings}
-        rem={rem}
-        theme={theme}
-        onCopy={() => actions.copyPath("keybindings")}
-      />
-      <Box style={{ margin: { top: rem * 0.3 } }}>
-        <TextButton label={copy.reload} rem={rem} theme={theme} onClick={actions.reloadConfig} />
-      </Box>
-    </ScrollPane>
+        resetKey={0}
+        style={{
+          flexGrow: 1,
+          flexBasis: 0,
+          flexDirection: "column",
+          padding: { top: rem * 0.3, bottom: rem * 0.8 },
+        }}
+      >
+        <AboutBlock about={view.about} rem={rem} theme={theme} />
+        <Divider rem={rem} theme={theme} />
+        <Box
+          style={{
+            flexDirection: "column",
+            gap: rem * 0.8,
+            padding: { top: rem * 0.3, left: rem * 1, right: rem * 1 },
+          }}
+        >
+          <PathLine
+            header={copy.files.settings}
+            path={view.files.settings}
+            rem={rem}
+            theme={theme}
+            onCopy={() => actions.copyPath("settings")}
+          />
+          <PathLine
+            header={copy.files.keybindings}
+            path={view.files.keybindings}
+            rem={rem}
+            theme={theme}
+            onCopy={() => actions.copyPath("keybindings")}
+          />
+          <Box style={{ margin: { top: rem * 0.3 } }}>
+            <TextButton label={copy.reload} rem={rem} theme={theme} onClick={actions.reloadConfig} />
+          </Box>
+        </Box>
+      </ScrollPane>
+    </>
   );
 }
 
@@ -66,7 +79,14 @@ function PathLine({
   const [copied, flash] = useCopiedFlash();
   return (
     <Box style={{ flexDirection: "column", gap: rem * 0.25 }}>
-      <Text style={{ fontSize: rem * 0.75, color: theme.muted, wrap: false, selectable: false }}>
+      <Text
+        style={{
+          fontSize: rem * 0.75,
+          color: theme.muted,
+          wrap: false,
+          selectable: false,
+        }}
+      >
         {header}
       </Text>
       <Box style={{ alignItems: "center", gap: rem * 0.4 }}>

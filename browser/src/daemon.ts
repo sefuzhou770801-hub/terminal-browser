@@ -9,6 +9,7 @@ import { DAEMON_SOCKET } from "pixel-store";
 import { createSession } from "./session/session";
 import type { SessionHandle } from "./session/session";
 import { servePages } from "./pages/scheme";
+import { updates } from "./update";
 
 // what
 const IDLE_EXIT_MS = 15_000;
@@ -21,6 +22,7 @@ interface OpenRequest {
   env?: Record<string, string | undefined>;
   cwd?: string;
   build?: string;
+  restore?: boolean;
 }
 
 export function buildStamp(): string {
@@ -48,8 +50,32 @@ export async function runDaemon(cdpPort: number | null): Promise<void> {
     const chosen = shown[shown.length - 1] ?? all[all.length - 1];
     return chosen?.pageContext() ?? { cwd: process.cwd(), theme: null };
   });
+  const notifiers = new Map<string, (value: unknown) => void>();
   let seq = 0;
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const manager = updates();
+  manager.bootCleanup();
+  manager.start();
+  // Each attached CLI hears "restarting" and reconnects with restore set, so the
+  // swapped-in daemon reopens the same tabs in the same panes.
+  manager.setRestartExecutor(async () => {
+    for (const open of sessions.values()) {
+      try {
+        open.snapshot();
+      } catch {}
+    }
+    manager.swap();
+    for (const notify of notifiers.values()) notify({ event: "restarting" });
+    for (const open of [...sessions.values()]) {
+      try {
+        open.close();
+      } catch {}
+    }
+    sessions.clear();
+    notifiers.clear();
+    setTimeout(() => app.exit(0), 200);
+  });
 
   const scheduleIdleExit = () => {
     if (idleTimer) clearTimeout(idleTimer);
@@ -117,8 +143,10 @@ export async function runDaemon(cdpPort: number | null): Promise<void> {
               env: message.env ?? {},
               cwd: message.cwd ?? process.cwd(),
               cdpPort,
+              restore: message.restore === true,
               onClose: (code) => {
                 sessions.delete(sessionKey);
+                notifiers.delete(sessionKey);
                 reply({ event: "closed", code });
                 connection.end();
                 scheduleIdleExit();
@@ -131,6 +159,7 @@ export async function runDaemon(cdpPort: number | null): Promise<void> {
             return;
           }
           sessions.set(sessionKey, session);
+          notifiers.set(sessionKey, reply);
           reply({ ok: true, session: sessionKey, pid: process.pid });
         } else if (message.cmd === "resize") {
           session?.nudgeResize();
@@ -140,6 +169,15 @@ export async function runDaemon(cdpPort: number | null): Promise<void> {
           reply({ ok: true, sessions: sessions.size });
           connection.end();
           setTimeout(() => app.exit(0), 50);
+        } else if (message.cmd === "upgrade") {
+          if (idleTimer) clearTimeout(idleTimer);
+          void manager
+            .upgradeFromCli(reply)
+            .catch(() => reply({ event: "upgrade", state: "failed" }))
+            .finally(() => {
+              connection.end();
+              scheduleIdleExit();
+            });
         }
       }
     });
@@ -148,6 +186,7 @@ export async function runDaemon(cdpPort: number | null): Promise<void> {
       if (key && sessions.has(key)) {
         const orphan = sessions.get(key)!;
         sessions.delete(key);
+        notifiers.delete(key);
         orphan.close();
         scheduleIdleExit();
       }

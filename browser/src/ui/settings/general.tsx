@@ -1,13 +1,21 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import type { ReactNode } from "react";
 import { Box, Image, Input, Text } from "@zenbu-labs/pixel";
 import { Icon } from "../icons";
 import { withAlpha } from "../theme";
 import type { Theme } from "../theme";
-import type { SettingChoiceView, SettingRow, SettingsActions, SettingsView } from "../types";
+import type {
+  SettingChoiceView,
+  SettingRow,
+  SettingsActions,
+  SettingsView,
+} from "../types";
 import { copy } from "./copy";
 import { ScrollPane } from "./scroll-pane";
 import { IconButton } from "./controls";
+import { Divider } from "./divider";
+import { HelpBlock } from "./help";
+import { UpdatesBlock } from "./updates";
 
 const TILES_PER_ROW = 4;
 
@@ -23,20 +31,28 @@ export function GeneralPane({
   theme: Theme;
 }) {
   return (
-    <ScrollPane
-      rem={rem}
-      resetKey={view.settings.length}
-      style={{
-        flexGrow: 1,
-        flexBasis: 0,
-        flexDirection: "column",
-        padding: { top: rem * 0.6, bottom: rem * 0.8 },
-      }}
-    >
-      {view.settings.map((row) => (
-        <SettingLine key={row.key} row={row} actions={actions} rem={rem} theme={theme} />
-      ))}
-    </ScrollPane>
+    <>
+      <ScrollPane
+        rem={rem}
+        resetKey={view.settings.length}
+        style={{
+          flexGrow: 1,
+          flexBasis: 0,
+          flexDirection: "column",
+          padding: { top: rem * 0.3, bottom: rem * 0.8 },
+        }}
+      >
+        <UpdatesBlock about={view.about} actions={actions} rem={rem} theme={theme} />
+        {view.settings.map((row) => (
+          <Fragment key={row.key}>
+            <Divider rem={rem} theme={theme} />
+            <SettingLine row={row} actions={actions} rem={rem} theme={theme} />
+          </Fragment>
+        ))}
+        <Divider rem={rem} theme={theme} />
+        <HelpBlock actions={actions} rem={rem} theme={theme} />
+      </ScrollPane>
+    </>
   );
 }
 
@@ -59,7 +75,12 @@ function SettingLine({
         flexShrink: 0,
         minWidth: 0,
         gap: rem * 0.35,
-        padding: { left: rem * 1, right: rem * 1, top: rem * 0.55, bottom: rem * 0.55 },
+        padding: {
+          left: rem * 1,
+          right: rem * 1,
+          top: rem * 0.55,
+          bottom: rem * 0.55,
+        },
       }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
@@ -103,13 +124,23 @@ function SettingLine({
           <TemplateField row={row} actions={actions} rem={rem} theme={theme} />
           {row.hint && <Hint text={row.hint} rem={rem} theme={theme} />}
           {row.link && (
-            <Link url={row.link} rem={rem} theme={theme} onClick={() => actions.openLink(row.link!)} />
+            <Link
+              url={row.link}
+              rem={rem}
+              theme={theme}
+              onClick={() => actions.openLink(row.link!)}
+            />
           )}
         </Advanced>
       ) : (
         <>
           {row.kind === "string" && (
-            <TemplateField row={row} actions={actions} rem={rem} theme={theme} />
+            <TemplateField
+              row={row}
+              actions={actions}
+              rem={rem}
+              theme={theme}
+            />
           )}
           {row.hint && <Hint text={row.hint} rem={rem} theme={theme} />}
         </>
@@ -137,7 +168,12 @@ function TemplateField({
         padding: { left: rem * 0.55, right: rem * 0.55 },
         cornerRadius: rem * 0.3,
         background: theme.field,
-        border: { width: 1, color: row.modified ? withAlpha(theme.accent, 150) : theme.fieldBorder },
+        border: {
+          width: 1,
+          color: row.modified
+            ? withAlpha(theme.accent, 150)
+            : theme.fieldBorder,
+        },
       }}
     >
       <Input
@@ -153,7 +189,15 @@ function TemplateField({
   );
 }
 
-function Hint({ text, rem, theme }: { text: string; rem: number; theme: Theme }) {
+function Hint({
+  text,
+  rem,
+  theme,
+}: {
+  text: string;
+  rem: number;
+  theme: Theme;
+}) {
   return (
     <Box style={{ minWidth: 0 }}>
       <Text
@@ -224,7 +268,13 @@ function ChoiceTiles({
     rows.push(choices.slice(i, i + TILES_PER_ROW));
   }
   return (
-    <Box style={{ flexDirection: "column", gap: rem * 0.35, margin: { top: rem * 0.1 } }}>
+    <Box
+      style={{
+        flexDirection: "column",
+        gap: rem * 0.35,
+        margin: { top: rem * 0.1 },
+      }}
+    >
       {rows.map((tiles, index) => (
         <Box key={index} style={{ gap: rem * 0.35 }}>
           {tiles.map((choice) => (
@@ -270,8 +320,13 @@ function ChoiceTile({
         padding: { left: rem * 0.6, right: rem * 0.6 },
         cornerRadius: rem * 0.35,
         background: selected ? withAlpha(theme.accent, 40) : theme.field,
-        hoverBackground: selected ? withAlpha(theme.accent, 60) : theme.hoverStrong,
-        border: { width: 1, color: selected ? theme.accent : theme.fieldBorder },
+        hoverBackground: selected
+          ? withAlpha(theme.accent, 60)
+          : theme.hoverStrong,
+        border: {
+          width: 1,
+          color: selected ? theme.accent : theme.fieldBorder,
+        },
       }}
       onClick={onClick}
     >
@@ -301,12 +356,18 @@ function ChoiceMark({
   size: number;
   theme: Theme;
 }) {
-  if (!choice.logo) return <Icon icon="close" size={size} color={theme.muted} />;
+  if (!choice.logo)
+    return <Icon icon="close" size={size} color={theme.muted} />;
   return (
     <Image
       src={choice.logo}
       error={<Box style={{ width: size, height: size }} />}
-      style={{ width: size, height: size, cornerRadius: size * 0.2, flexShrink: 0 }}
+      style={{
+        width: size,
+        height: size,
+        cornerRadius: size * 0.2,
+        flexShrink: 0,
+      }}
     />
   );
 }
@@ -331,8 +392,19 @@ function Advanced({
           style={{ alignItems: "center", gap: rem * 0.25 }}
           onClick={() => setOpen(!shown)}
         >
-          <Icon icon={shown ? "down" : "forward"} size={rem * 0.8} color={theme.muted} />
-          <Text style={{ fontSize: rem * 0.78, color: theme.muted, wrap: false, selectable: false }}>
+          <Icon
+            icon={shown ? "down" : "forward"}
+            size={rem * 0.8}
+            color={theme.muted}
+          />
+          <Text
+            style={{
+              fontSize: rem * 0.78,
+              color: theme.muted,
+              wrap: false,
+              selectable: false,
+            }}
+          >
             {copy.advanced}
           </Text>
         </Box>

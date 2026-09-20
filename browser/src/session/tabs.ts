@@ -271,6 +271,10 @@ export class TabManager {
     }));
   }
 
+  restoreView(): { url: string; active: boolean }[] {
+    return this.tabs.map((tab) => ({ url: tab.state.url, active: tab.id === this.activeId }));
+  }
+
   registryView(): TabTarget[] {
     return this.tabs.map((tab) => ({
       id: tab.id,

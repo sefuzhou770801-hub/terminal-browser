@@ -24,12 +24,17 @@ import {
   KEYBINDINGS_FILE,
   SETTINGS_FILE,
   TERMINAL_SOCKET_ENV,
+  installedChannel,
+  installedVersion,
   lastUrl,
   listApps,
+  releaseTarget,
+  saveRestoreSnapshot,
   setLastUrl,
   settings as settingsTable,
   socketTerminal,
   store,
+  takeRestoreSnapshot,
 } from "pixel-store";
 import type { InstanceRow, RegisteredApp } from "pixel-store";
 
@@ -50,6 +55,7 @@ import type {
   DownloadView,
   NewTabSuggestion,
   PageMenuItem,
+  AboutView,
   PageMenuView,
   TabActions,
   TabView,
@@ -63,6 +69,7 @@ import { fuzzyScore } from "./fuzzy";
 import { clampDevtoolsFraction, computeLayout, dividerFraction, recordBarHeight } from "./layout";
 import type { DevtoolsPlacement, SurfaceLayout } from "./layout";
 import { SUGGESTIONS_OFF } from "../config/search";
+import { updates } from "../update";
 import { SettingsManager } from "./settings";
 import { fetchSuggestions } from "./suggest";
 import { TabManager } from "./tabs";
@@ -75,6 +82,7 @@ export interface SessionContext {
   env: NodeJS.ProcessEnv;
   cwd: string;
   cdpPort: number | null;
+  restore?: boolean;
   onClose(code: number): void;
 }
 
@@ -82,6 +90,7 @@ export interface SessionHandle {
   ready: Promise<void>;
   close(code?: number): void;
   nudgeResize(): void;
+  snapshot(): void;
   pageContext(): PageContext;
   showsStartPage(): boolean;
 }
@@ -96,6 +105,7 @@ export function createSession(ctx: SessionContext): SessionHandle {
     ready,
     close: (code = 0) => session.shutdown(code),
     nudgeResize: () => session.nudgeResize(),
+    snapshot: () => session.snapshotForRestart(),
     pageContext: () => session.pageContext(),
     showsStartPage: () => session.showsStartPage(),
   };
@@ -168,9 +178,11 @@ class Session {
   private readonly settings = new SettingsManager(
     {
       requestRender: () => this.render(),
-      toast: (text, state) => this.showToast(text, state),
+      toast: (text, state, detail) => this.showToast(text, state, detail),
       setClipboard: (text) => this.root?.setClipboard(text),
       openUrl: (url) => this.tabs.create(url),
+      about: () => this.about(),
+      updates: updates(),
       overlayOpened: () => this.enterOverlay([]),
       overlayClosed: () => this.leaveOverlay(),
     },
@@ -227,6 +239,7 @@ class Session {
   private recordStarting = false;
   private readonly defaultUrl: string;
   private sessionHidden = false;
+  private stopUpdateListener: (() => void) | null = null;
 
   constructor(ctx: SessionContext) {
     this.ctx = ctx;
@@ -326,7 +339,8 @@ class Session {
     this.settings.watch();
     this.recalculateLayout();
     this.root.setPointerShape("default");
-    this.tabs.create(this.fallbackState.url);
+    this.stopUpdateListener = updates().subscribe(() => this.render());
+    if (!(this.ctx.restore && this.restoreTabs())) this.tabs.create(this.fallbackState.url);
     this.registry = new Registry({
       key: this.ctx.key,
       tty: this.ctx.tty ?? null,
@@ -405,6 +419,8 @@ class Session {
     this.shownRecord = null;
     this.registry?.dispose();
     this.registry = null;
+    this.stopUpdateListener?.();
+    this.stopUpdateListener = null;
     this.settings.dispose();
     this.tabs.stopAll();
     if (this.root) this.root.stop(code);
@@ -1431,6 +1447,46 @@ class Session {
     return normalizeUrl(searchOrUrl(text, this.ctx.cwd, search), this.ctx.cwd, search);
   }
 
+  snapshotForRestart() {
+    if (!this.ctx.tty) return;
+    const tabs = this.tabs.restoreView();
+    if (tabs.length === 0) return;
+    try {
+      saveRestoreSnapshot(this.ctx.tty, { at: Date.now(), tabs });
+    } catch {}
+  }
+
+  private restoreTabs(): boolean {
+    if (!this.ctx.tty) return false;
+    let snapshot: ReturnType<typeof takeRestoreSnapshot> = null;
+    try {
+      snapshot = takeRestoreSnapshot(this.ctx.tty);
+    } catch {}
+    if (!snapshot) return false;
+    let activeId: number | null = null;
+    let firstId: number | null = null;
+    for (const row of snapshot.tabs) {
+      const tab = this.tabs.create(row.url, false);
+      firstId ??= tab.id;
+      if (row.active) activeId = tab.id;
+    }
+    if (firstId === null) return false;
+    this.tabs.activate(activeId ?? firstId);
+    return true;
+  }
+
+  private about(): Omit<AboutView, "update" | "canCheck" | "canMock"> {
+    return {
+      version: installedVersion() ?? "dev",
+      channel: installedVersion() ? installedChannel() : "dev",
+      chromium: process.versions.chrome ?? "",
+      electron: process.versions.electron ?? "",
+      node: process.versions.node,
+      pixel: pixelVersion(),
+      target: releaseTarget(),
+    };
+  }
+
   pageContext(): PageContext {
     const colors = this.root?.info.colors;
     return { cwd: this.ctx.cwd, theme: colors ? makeTheme(colors) : null };
@@ -1474,6 +1530,14 @@ function rememberUrl(url: string) {
   try {
     setLastUrl(url);
   } catch { }
+}
+
+function pixelVersion(): string {
+  try {
+    return (require("@zenbu-labs/pixel/package.json") as { version: string }).version;
+  } catch {
+    return "";
+  }
 }
 
 function embeddedAgent(url: string | undefined, token: string | undefined): EmbeddedAgent | null {

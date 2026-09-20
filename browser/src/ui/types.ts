@@ -65,6 +65,25 @@ export interface ShortcutRow {
   conflicts: string[];
 }
 
+export interface UpdateView {
+  state: "checking" | "available" | "downloading" | "staged" | "restarting";
+  version: string | null;
+  percent: number | null;
+}
+
+export interface AboutView {
+  version: string;
+  channel: string;
+  chromium: string;
+  electron: string;
+  node: string;
+  pixel: string;
+  target: string;
+  update: UpdateView | null;
+  canCheck: boolean;
+  canMock: boolean;
+}
+
 export interface SettingChoiceView {
   value: string;
   name: string;
@@ -89,6 +108,7 @@ export interface SettingsView {
   shortcuts: ShortcutRow[];
   settings: SettingRow[];
   files: { settings: string; keybindings: string };
+  about: AboutView;
 }
 
 export interface SettingsActions {
@@ -106,6 +126,10 @@ export interface SettingsActions {
   copyAgentBrief(): void;
   copyPath(file: "settings" | "keybindings"): void;
   openLink(url: string): void;
+  updateCheck(): void;
+  updateDownload(): void;
+  updateRestart(): void;
+  updateMock(brewStyle: boolean): void;
 }
 
 export interface ChromeActions {

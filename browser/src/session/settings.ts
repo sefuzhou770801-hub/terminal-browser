@@ -13,13 +13,32 @@ import type { Chord, KeybindingOverrides } from "../config/keys";
 import { SUGGESTIONS_OFF, engineBySearch, engineBySuggest } from "../config/search";
 import { SETTINGS, SETTING_KEYS, defaultSettings, isSettingKey } from "../config/settings";
 import type { SettingKey, Settings } from "../config/settings";
-import type { SettingRow, SettingsActions, SettingsSection, SettingsView } from "../ui/types";
+import type {
+  AboutView,
+  SettingRow,
+  SettingsActions,
+  SettingsSection,
+  SettingsView,
+  UpdateView,
+} from "../ui/types";
+
+export interface UpdateSource {
+  view(): UpdateView | null;
+  canCheck(): boolean;
+  canMock(): boolean;
+  check(force: boolean): Promise<void>;
+  download(): Promise<void>;
+  requestRestart(): void;
+  mockUpdate(brewStyle: boolean): Promise<void>;
+}
 
 export interface SettingsHost {
   requestRender(): void;
-  toast(text: string, state: "done" | "failed"): void;
+  toast(text: string, state: "done" | "failed", detail?: string): void;
   setClipboard(text: string): void;
   openUrl(url: string): void;
+  about(): Omit<AboutView, "update" | "canCheck" | "canMock">;
+  updates: UpdateSource;
   overlayOpened(): void;
   overlayClosed(): void;
 }
@@ -207,6 +226,10 @@ export class SettingsManager {
       this.close();
       this.host.openUrl(url);
     },
+    updateCheck: () => void this.checkForUpdates(),
+    updateDownload: () => void this.host.updates.download(),
+    updateRestart: () => this.host.updates.requestRestart(),
+    updateMock: (brewStyle) => void this.host.updates.mockUpdate(brewStyle),
   };
 
   view(): SettingsView | null {
@@ -244,7 +267,23 @@ export class SettingsManager {
         settings: homeRelative(this.config.files.settings),
         keybindings: homeRelative(this.config.files.keybindings),
       },
+      about: {
+        ...this.host.about(),
+        update: this.host.updates.view(),
+        canCheck: this.host.updates.canCheck(),
+        canMock: this.host.updates.canMock(),
+      },
     };
+  }
+
+  private async checkForUpdates() {
+    try {
+      await this.host.updates.check(true);
+    } catch (error) {
+      this.host.toast("update check failed", "failed", String(error));
+      return;
+    }
+    if (!this.host.updates.view()) this.host.toast("up to date", "done");
   }
 
   private set(key: string, value: string | undefined) {

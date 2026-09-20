@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { enableTerminalImages } from "./editors";
-import { installedVersion } from "./upgrade";
+import { installedVersion } from "pixel-store";
 
 interface AgentEntry {
   name: string;

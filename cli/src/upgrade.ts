@@ -1,46 +1,18 @@
 import { spawn } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 
+import {
+  brewPrefix,
+  fetchLatestManifest,
+  installedChannel,
+  installedVersion,
+  isNewerVersion,
+} from "pixel-store";
+
+import { connectDaemon, nextReply } from "./daemon-client";
 import { instances } from "./registry";
 import type { InstanceRecord } from "./registry";
-
-const RELEASE_ORIGIN = process.env.TERMINAL_BROWSER_RELEASE_ORIGIN ?? "https://terminal-browser.sh/install";
-
-interface Latest {
-  version: string;
-  install: string;
-}
-
-export function installedVersion(): string | null {
-  const root = process.env.TERMINAL_BROWSER_DIST_ROOT;
-  if (!root) return null;
-  try {
-    return fs.readFileSync(path.join(root, "VERSION"), "utf8").trim() || null;
-  } catch {
-    return null;
-  }
-}
-
-function installedChannel(): string {
-  const root = process.env.TERMINAL_BROWSER_DIST_ROOT;
-  if (!root) return "stable";
-  try {
-    return fs.readFileSync(path.join(root, "CHANNEL"), "utf8").trim() || "stable";
-  } catch {
-    return "stable";
-  }
-}
-
-async function fetchLatest(channel: string): Promise<Latest> {
-  const url = channel === "stable" ? `${RELEASE_ORIGIN}/latest.json` : `${RELEASE_ORIGIN}/${channel}/latest.json`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`release check failed (${response.status} from ${url})`);
-  const latest = (await response.json()) as Latest;
-  if (!latest.version || !latest.install) throw new Error(`release check failed (bad manifest from ${url})`);
-  return latest;
-}
 
 function describeInstance(record: InstanceRecord): string {
   const page = record.title && record.title !== record.url ? `${record.title}  ${record.url}` : record.url;
@@ -67,20 +39,80 @@ function runInstaller(url: string): Promise<number> {
   });
 }
 
+// a live daemon upgrades itself in place and restarts, so open browsers survive
+async function upgradeViaDaemon(): Promise<number | null> {
+  let socket;
+  try {
+    socket = await connectDaemon();
+  } catch {
+    return null;
+  }
+  return new Promise<number>((resolve) => {
+    let restarting = false;
+    let settled = false;
+    let progressShown = false;
+    const finish = (code: number) => {
+      if (settled) return;
+      settled = true;
+      if (progressShown) process.stdout.write("\n");
+      socket.destroy();
+      resolve(code);
+    };
+    const timer = setTimeout(() => finish(restarting ? 0 : 1), 10 * 60_000);
+    nextReply(socket, (reply) => {
+      if (reply.event !== "upgrade") return;
+      if (reply.state === "current") {
+        process.stdout.write(`already up to date (${reply.version ?? ""})\n`);
+        clearTimeout(timer);
+        finish(0);
+      } else if (reply.state === "downloading") {
+        if (typeof reply.percent === "number") {
+          progressShown = true;
+          process.stdout.write(`\r${reply.percent}%`);
+        }
+      } else if (reply.state === "restarting") {
+        restarting = true;
+      } else if (reply.state === "failed") {
+        clearTimeout(timer);
+        process.stderr.write("[placeholder copy: upgrade failed, see the daemon log]\n");
+        finish(1);
+      }
+    });
+    socket.on("close", () => {
+      clearTimeout(timer);
+      finish(restarting ? 0 : 1);
+    });
+    socket.on("error", () => finish(restarting ? 0 : 1));
+    socket.write('{"cmd":"upgrade"}\n');
+  });
+}
+
 export async function upgradeCommand(): Promise<number> {
   const current = installedVersion();
   if (!current) {
     throw new Error("Could not perform upgrade: please file an issue https://github.com/zenbu-labs/terminal-browser/issues");
   }
-  const latest = await fetchLatest(installedChannel());
-  if (latest.version === current) {
+  const channel = installedChannel();
+  if (channel === "local") {
+    process.stdout.write("[placeholder copy: this is a local build, reinstall it with pnpm dist]\n");
+    return 0;
+  }
+  const latest = await fetchLatestManifest(channel);
+  if (!isNewerVersion(current, latest.version, channel)) {
     process.stdout.write(`already up to date (${current})\n`);
     return 0;
   }
-  if (process.env.TERMINAL_BROWSER_DIST_ROOT?.split(path.sep).includes("Caskroom")) {
-    process.stdout.write(`${latest.version} is available. This install is managed by Homebrew, run:\n`);
-    process.stdout.write("  brew upgrade --cask terminal-browser\n");
-    return 0;
+  const delegated = await upgradeViaDaemon();
+  if (delegated !== null) return delegated;
+  const prefix = brewPrefix();
+  if (prefix) {
+    const brew = spawn(path.join(prefix, "bin", "brew"), ["upgrade", "--cask", "terminal-browser"], {
+      stdio: "inherit",
+    });
+    return new Promise((resolve, reject) => {
+      brew.on("error", reject);
+      brew.on("exit", (code) => resolve(code ?? 1));
+    });
   }
   const open = await instances();
   if (open.length > 0 && process.stdin.isTTY && process.stdout.isTTY) {
