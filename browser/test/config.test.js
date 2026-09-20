@@ -246,3 +246,19 @@ test("recording shows the chord until enter commits it and escape drops it", () 
   assert.equal(manager.view().recording, null);
   assert.equal(manager.keymap.label("find"), "ctrl+k");
 });
+
+test("shortcuts with chords that do not parse are reported instead of silently unbinding", () => {
+  const store = tempStore();
+  fs.mkdirSync(path.dirname(store.files.shortcuts), { recursive: true });
+  fs.writeFileSync(
+    store.files.shortcuts,
+    JSON.stringify({ find: "ctrll+f", palette: ["ctrl+p", "bogus++x"], "tab.new": "ctrl+t" }),
+  );
+  const loaded = store.load();
+  assert.deepEqual(loaded.shortcuts, { "tab.new": ["ctrl+t"] });
+  assert.equal(loaded.errors.length, 2);
+  assert.match(loaded.errors[0], /find/);
+  assert.match(loaded.errors[1], /palette › 1/);
+  const keymap = new Keymap(loaded.shortcuts, { noSuper: false });
+  assert.notEqual(keymap.label("find"), "");
+});

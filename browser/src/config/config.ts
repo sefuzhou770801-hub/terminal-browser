@@ -7,6 +7,7 @@ import { z } from "zod";
 import { COMMAND_IDS, isCommandId } from "./commands";
 import type { CommandId } from "./commands";
 import { jsonText } from "./json";
+import { parseChord } from "./keys";
 import type { ShortcutOverrides } from "./keys";
 import { SETTINGS, SETTING_KEYS, defaultSettings } from "./settings";
 import type { SettingKey, Settings } from "./settings";
@@ -35,7 +36,21 @@ const jsonObject = z
 
 type JsonObject = z.infer<typeof jsonObject>;
 
-const shortcut = z.union([z.null(), z.string().transform((key) => [key]), z.array(z.string())]);
+const chord = z.string().refine((spec) => parseChord(spec) !== null, {
+  message: "not a valid key chord",
+});
+
+const shortcut = z.union([z.null(), chord.transform((key) => [key]), z.array(chord)]);
+
+function deepestIssue(issues: z.core.$ZodIssue[]): { path: PropertyKey[]; message: string } {
+  let best = issues[0];
+  const visit = (issue: z.core.$ZodIssue) => {
+    if (issue.path.length > best.path.length) best = issue;
+    if (issue.code === "invalid_union") for (const branch of issue.errors) branch.forEach(visit);
+  };
+  issues.forEach(visit);
+  return best;
+}
 
 function describe(file: string, issue: { path: PropertyKey[]; message: string }): string {
   const where = [path.basename(file), ...issue.path.map(String)].join(" › ");
@@ -78,7 +93,10 @@ function shortcutsFrom(file: string, raw: JsonObject): { value: ShortcutOverride
     }
     const parsed = shortcut.safeParse(entry);
     if (parsed.success) value[id] = parsed.data;
-    else errors.push(describe(file, { path: [id], message: parsed.error.issues[0].message }));
+    else {
+      const issue = deepestIssue(parsed.error.issues);
+      errors.push(describe(file, { path: [id, ...issue.path], message: issue.message }));
+    }
   }
   return { value, errors };
 }
