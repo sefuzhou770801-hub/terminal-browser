@@ -9,7 +9,7 @@ export {
   DB_FILE,
   CONFIG_DIR,
   SETTINGS_FILE,
-  KEYBINDINGS_FILE,
+  SHORTCUTS_FILE,
   ensureDataDir,
 } from "./paths";
 export { openStore, store } from "./client";

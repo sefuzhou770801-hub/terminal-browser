@@ -88,7 +88,7 @@ export interface SettingsView {
   recording: { id: string; label: string; keys: string } | null;
   shortcuts: ShortcutRow[];
   settings: SettingRow[];
-  files: { settings: string; keybindings: string };
+  files: { settings: string; shortcuts: string };
 }
 
 export interface SettingsActions {
@@ -104,7 +104,7 @@ export interface SettingsActions {
   reset(key: string): void;
   reloadConfig(): void;
   copyAgentBrief(): void;
-  copyPath(file: "settings" | "keybindings"): void;
+  copyPath(file: "settings" | "shortcuts"): void;
   openLink(url: string): void;
 }
 

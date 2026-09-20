@@ -37,11 +37,11 @@ export function AdvancedPane({
         onCopy={() => actions.copyPath("settings")}
       />
       <PathLine
-        header={copy.files.keybindings}
-        path={view.files.keybindings}
+        header={copy.files.shortcuts}
+        path={view.files.shortcuts}
         rem={rem}
         theme={theme}
-        onCopy={() => actions.copyPath("keybindings")}
+        onCopy={() => actions.copyPath("shortcuts")}
       />
       <Box style={{ margin: { top: rem * 0.3 } }}>
         <TextButton label={copy.reload} rem={rem} theme={theme} onClick={actions.reloadConfig} />

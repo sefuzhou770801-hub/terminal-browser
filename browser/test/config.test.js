@@ -21,7 +21,7 @@ function tempStore() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tb-config-"));
   return new ConfigStore({
     settings: path.join(dir, "settings.json"),
-    keybindings: path.join(dir, "keybindings.json"),
+    shortcuts: path.join(dir, "shortcuts.json"),
   });
 }
 
@@ -77,7 +77,7 @@ test("keymap reports conflicts between commands sharing a chord", () => {
   assert.deepEqual(new Keymap({}, { noSuper: false }).conflicts("tab.close"), []);
 });
 
-test("config store round trips settings and keybindings", () => {
+test("config store round trips settings and shortcuts", () => {
   const store = tempStore();
   assert.deepEqual(store.load().errors, []);
   assert.equal(store.load().settings["search.engine"].includes("%s"), true);
@@ -89,18 +89,18 @@ test("config store round trips settings and keybindings", () => {
   store.setSetting("search.suggestions", undefined);
   assert.equal(store.load().settings["search.suggestions"].includes("google"), true);
 
-  store.setKeybinding("tab.close", ["ctrl+shift+w"]);
-  store.setKeybinding("find", null);
-  store.setKeybinding("palette", ["ctrl+p", "alt+p"]);
-  const raw = JSON.parse(fs.readFileSync(store.files.keybindings, "utf8"));
+  store.setShortcut("tab.close", ["ctrl+shift+w"]);
+  store.setShortcut("find", null);
+  store.setShortcut("palette", ["ctrl+p", "alt+p"]);
+  const raw = JSON.parse(fs.readFileSync(store.files.shortcuts, "utf8"));
   assert.deepEqual(raw, { "tab.close": "ctrl+shift+w", find: null, palette: ["ctrl+p", "alt+p"] });
-  assert.deepEqual(store.load().keybindings, {
+  assert.deepEqual(store.load().shortcuts, {
     "tab.close": ["ctrl+shift+w"],
     find: null,
     palette: ["ctrl+p", "alt+p"],
   });
-  store.setKeybinding("find", undefined);
-  assert.equal("find" in store.load().keybindings, false);
+  store.setShortcut("find", undefined);
+  assert.equal("find" in store.load().shortcuts, false);
 });
 
 test("config store keeps unknown keys and refuses to overwrite broken files", () => {
@@ -116,29 +116,29 @@ test("config store keeps unknown keys and refuses to overwrite broken files", ()
   store.setSetting("search.engine", undefined);
   assert.deepEqual(store.load().errors, []);
 
-  fs.writeFileSync(store.files.keybindings, "{ not json");
+  fs.writeFileSync(store.files.shortcuts, "{ not json");
   const broken = store.load();
   assert.equal(broken.errors.length, 1);
-  assert.equal(broken.keybindings, null);
+  assert.equal(broken.shortcuts, null);
   assert.equal(broken.settings["search.suggestions"], "off");
-  assert.throws(() => store.setKeybinding("find", null));
-  assert.equal(fs.readFileSync(store.files.keybindings, "utf8"), "{ not json");
+  assert.throws(() => store.setShortcut("find", null));
+  assert.equal(fs.readFileSync(store.files.shortcuts, "utf8"), "{ not json");
 });
 
-test("keybindings report unknown commands and bad values but keep the rest", () => {
+test("shortcuts report unknown commands and bad values but keep the rest", () => {
   const store = tempStore();
-  fs.mkdirSync(path.dirname(store.files.keybindings), { recursive: true });
+  fs.mkdirSync(path.dirname(store.files.shortcuts), { recursive: true });
   fs.writeFileSync(
-    store.files.keybindings,
+    store.files.shortcuts,
     JSON.stringify({ "tab.clsoe": "ctrl+w", find: 7, palette: ["ctrl+p"] }),
   );
   const loaded = store.load();
-  assert.deepEqual(loaded.keybindings, { palette: ["ctrl+p"] });
+  assert.deepEqual(loaded.shortcuts, { palette: ["ctrl+p"] });
   assert.equal(loaded.errors.length, 2);
   assert.match(loaded.errors[0], /tab\.clsoe/);
   assert.match(loaded.errors[1], /find/);
-  store.setKeybinding("find", null);
-  assert.equal(JSON.parse(fs.readFileSync(store.files.keybindings, "utf8")).find, null);
+  store.setShortcut("find", null);
+  assert.equal(JSON.parse(fs.readFileSync(store.files.shortcuts, "utf8")).find, null);
 });
 
 test("config store recognises its own writes until someone else edits the file", () => {
@@ -157,7 +157,7 @@ test("config watcher reports external edits and ignores the store's own writes",
   const changes = [];
   const stop = store.watch((files) => changes.push(files));
   try {
-    store.setKeybinding("find", null);
+    store.setShortcut("find", null);
     await settled();
     assert.deepEqual(changes, []);
 

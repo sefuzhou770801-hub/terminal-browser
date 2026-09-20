@@ -9,7 +9,7 @@ import type { CommandId } from "../config/commands";
 import { ConfigStore } from "../config/config";
 import type { ConfigFiles } from "../config/config";
 import { Keymap, chordFromEvent, formatChord } from "../config/keys";
-import type { Chord, KeybindingOverrides } from "../config/keys";
+import type { Chord, ShortcutOverrides } from "../config/keys";
 import { SUGGESTIONS_OFF, engineBySearch, engineBySuggest } from "../config/search";
 import { SETTINGS, SETTING_KEYS, defaultSettings, isSettingKey } from "../config/settings";
 import type { SettingKey, Settings } from "../config/settings";
@@ -46,7 +46,7 @@ function agentBrief(files: ConfigFiles): string {
   return [
     "terminal-browser config files:",
     `  settings: ${files.settings}`,
-    `  keybindings: ${files.keybindings}`,
+    `  shortcuts: ${files.shortcuts}`,
     "More documentation about features, settings, and keybinds are available at the project's readme",
     "https://github.com/zenbu-labs/terminal-browser/README.md",
     "",
@@ -61,7 +61,7 @@ function homeRelative(file: string): string {
 export class SettingsManager {
   private readonly config: ConfigStore;
   private values: Settings;
-  private overrides: KeybindingOverrides;
+  private overrides: ShortcutOverrides;
   private map: Keymap;
   private noSuper = false;
   private stopWatching: (() => void) | null = null;
@@ -75,7 +75,7 @@ export class SettingsManager {
     this.config = new ConfigStore(files);
     const loaded = this.config.load();
     this.values = loaded.settings ?? defaultSettings();
-    this.overrides = loaded.keybindings ?? {};
+    this.overrides = loaded.shortcuts ?? {};
     this.map = new Keymap(this.overrides, { noSuper: false });
   }
 
@@ -103,7 +103,7 @@ export class SettingsManager {
   reload(announce: boolean) {
     const loaded = this.config.load();
     if (loaded.settings) this.values = loaded.settings;
-    if (loaded.keybindings) this.overrides = loaded.keybindings;
+    if (loaded.shortcuts) this.overrides = loaded.shortcuts;
     this.map = new Keymap(this.overrides, { noSuper: this.noSuper });
     this.host.requestRender();
     if (loaded.errors.length) this.host.toast(loaded.errors[0], "failed");
@@ -150,7 +150,7 @@ export class SettingsManager {
     if (pressed === "enter" && recording.chord) {
       const keys = [formatChord(recording.chord)];
       this.modal!.recording = null;
-      this.write(() => this.config.setKeybinding(recording.id, keys));
+      this.write(() => this.config.setShortcut(recording.id, keys));
       return;
     }
     recording.chord = chord;
@@ -184,10 +184,10 @@ export class SettingsManager {
       this.host.requestRender();
     },
     resetShortcut: (id) => {
-      if (isCommandId(id)) this.write(() => this.config.setKeybinding(id, undefined));
+      if (isCommandId(id)) this.write(() => this.config.setShortcut(id, undefined));
     },
     unbindShortcut: (id) => {
-      if (isCommandId(id)) this.write(() => this.config.setKeybinding(id, null));
+      if (isCommandId(id)) this.write(() => this.config.setShortcut(id, null));
     },
     set: (key, value) => this.set(key, value),
     reset: (key) => this.set(key, undefined),
@@ -242,7 +242,7 @@ export class SettingsManager {
       settings: SETTING_KEYS.map((key) => settingRow(key, this.values[key])),
       files: {
         settings: homeRelative(this.config.files.settings),
-        keybindings: homeRelative(this.config.files.keybindings),
+        shortcuts: homeRelative(this.config.files.shortcuts),
       },
     };
   }

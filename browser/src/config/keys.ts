@@ -104,7 +104,7 @@ function withoutSuper(chord: Chord): Chord {
   return chord.super ? { ...chord, super: false, alt: true } : chord;
 }
 
-export type KeybindingOverrides = Partial<Record<CommandId, string[] | null>>;
+export type ShortcutOverrides = Partial<Record<CommandId, string[] | null>>;
 
 export interface ResolvedBinding {
   id: CommandId;
@@ -115,7 +115,7 @@ export interface ResolvedBinding {
 export class Keymap {
   private readonly bindings = new Map<CommandId, ResolvedBinding>();
 
-  constructor(overrides: KeybindingOverrides, options: { noSuper: boolean }) {
+  constructor(overrides: ShortcutOverrides, options: { noSuper: boolean }) {
     for (const id of COMMAND_IDS) {
       const override = overrides[id];
       const chords =

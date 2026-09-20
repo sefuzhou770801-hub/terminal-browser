@@ -7,19 +7,19 @@ import { z } from "zod";
 import { COMMAND_IDS, isCommandId } from "./commands";
 import type { CommandId } from "./commands";
 import { jsonText } from "./json";
-import type { KeybindingOverrides } from "./keys";
+import type { ShortcutOverrides } from "./keys";
 import { SETTINGS, SETTING_KEYS, defaultSettings } from "./settings";
 import type { SettingKey, Settings } from "./settings";
 
 export interface ConfigFiles {
   settings: string;
-  keybindings: string;
+  shortcuts: string;
 }
 
 
 export interface LoadedConfig {
   settings: Settings | null;
-  keybindings: KeybindingOverrides | null;
+  shortcuts: ShortcutOverrides | null;
   errors: string[];
 }
 
@@ -35,7 +35,7 @@ const jsonObject = z
 
 type JsonObject = z.infer<typeof jsonObject>;
 
-const keybinding = z.union([z.null(), z.string().transform((key) => [key]), z.array(z.string())]);
+const shortcut = z.union([z.null(), z.string().transform((key) => [key]), z.array(z.string())]);
 
 function describe(file: string, issue: { path: PropertyKey[]; message: string }): string {
   const where = [path.basename(file), ...issue.path.map(String)].join(" › ");
@@ -68,15 +68,15 @@ function settingsFrom(file: string, raw: JsonObject): { value: Settings; errors:
   return { value: value as Settings, errors };
 }
 
-function keybindingsFrom(file: string, raw: JsonObject): { value: KeybindingOverrides; errors: string[] } {
-  const value: KeybindingOverrides = {};
+function shortcutsFrom(file: string, raw: JsonObject): { value: ShortcutOverrides; errors: string[] } {
+  const value: ShortcutOverrides = {};
   const errors: string[] = [];
   for (const [id, entry] of Object.entries(raw)) {
     if (!isCommandId(id)) {
       errors.push(describe(file, { path: [id], message: `unknown command, expected one of ${COMMAND_IDS.join(", ")}` }));
       continue;
     }
-    const parsed = keybinding.safeParse(entry);
+    const parsed = shortcut.safeParse(entry);
     if (parsed.success) value[id] = parsed.data;
     else errors.push(describe(file, { path: [id], message: parsed.error.issues[0].message }));
   }
@@ -94,18 +94,18 @@ export class ConfigStore {
 
   load(): LoadedConfig {
     const settingsFile = readJsonObject(this.files.settings);
-    const keybindingsFile = readJsonObject(this.files.keybindings);
+    const shortcutsFile = readJsonObject(this.files.shortcuts);
     const settings = settingsFile.value && settingsFrom(this.files.settings, settingsFile.value);
-    const keybindings =
-      keybindingsFile.value && keybindingsFrom(this.files.keybindings, keybindingsFile.value);
+    const shortcuts =
+      shortcutsFile.value && shortcutsFrom(this.files.shortcuts, shortcutsFile.value);
     return {
       settings: settings?.value ?? null,
-      keybindings: keybindings?.value ?? null,
+      shortcuts: shortcuts?.value ?? null,
       errors: [
         settingsFile.error,
         ...(settings?.errors ?? []),
-        keybindingsFile.error,
-        ...(keybindings?.errors ?? []),
+        shortcutsFile.error,
+        ...(shortcuts?.errors ?? []),
       ].filter((error): error is string => !!error),
     };
   }
@@ -116,7 +116,7 @@ export class ConfigStore {
   }
 
   watch(onChange: (files: ConfigFile[]) => void): () => void {
-    const names: ConfigFile[] = ["settings", "keybindings"];
+    const names: ConfigFile[] = ["settings", "shortcuts"];
     const seen = new Map<ConfigFile, string>(
       names.map((name) => [name, digest(readText(this.files[name]))]),
     );
@@ -155,8 +155,8 @@ export class ConfigStore {
     this.update(this.files.settings, key, value);
   }
 
-  setKeybinding(id: CommandId, keys: string[] | null | undefined) {
-    this.update(this.files.keybindings, id, keys === undefined ? undefined : keys?.length === 1 ? keys[0] : keys);
+  setShortcut(id: CommandId, keys: string[] | null | undefined) {
+    this.update(this.files.shortcuts, id, keys === undefined ? undefined : keys?.length === 1 ? keys[0] : keys);
   }
 
   private update(file: string, key: string, value: unknown) {

@@ -21,7 +21,7 @@ import { AgentPaneFinder } from "../grab/target";
 import type { EmbeddedAgent } from "../grab/target";
 import type { ZoomDirection } from "../zoom";
 import {
-  KEYBINDINGS_FILE,
+  SHORTCUTS_FILE,
   SETTINGS_FILE,
   TERMINAL_SOCKET_ENV,
   lastUrl,
@@ -174,7 +174,7 @@ class Session {
       overlayOpened: () => this.enterOverlay([]),
       overlayClosed: () => this.leaveOverlay(),
     },
-    { settings: SETTINGS_FILE, keybindings: KEYBINDINGS_FILE },
+    { settings: SETTINGS_FILE, shortcuts: SHORTCUTS_FILE },
   );
   private readonly tabs: TabManager;
   private readonly fallbackState: WebViewState;

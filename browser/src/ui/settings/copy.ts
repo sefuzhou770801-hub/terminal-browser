@@ -13,5 +13,5 @@ export const copy = {
   reload: "reload config",
   advanced: "advanced",
   agent: ["configure with", "agent"],
-  files: { settings: "settings", keybindings: "keybindings" },
+  files: { settings: "settings", shortcuts: "shortcuts" },
 };

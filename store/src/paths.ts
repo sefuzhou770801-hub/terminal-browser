@@ -60,7 +60,7 @@ function configDir(): string {
 
 export const CONFIG_DIR = configDir();
 export const SETTINGS_FILE = path.join(CONFIG_DIR, "settings.json");
-export const KEYBINDINGS_FILE = path.join(CONFIG_DIR, "keybindings.json");
+export const SHORTCUTS_FILE = path.join(CONFIG_DIR, "shortcuts.json");
 
 export function ensureDataDir(): void {
   fs.mkdirSync(DATA_DIR, { recursive: true });
