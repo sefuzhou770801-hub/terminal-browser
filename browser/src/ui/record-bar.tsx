@@ -11,6 +11,7 @@ import { DismissButton } from "./record-widgets";
 import { mix, withAlpha } from "./theme";
 import type { Theme } from "./theme";
 import type { ChromeActions, ChromeLayout } from "./types";
+import { STRINGS } from "./strings";
 
 const INTERACTION_ICONS: Record<InteractionKind, IconName> = {
   click: "cursor",
@@ -33,10 +34,10 @@ function interactionColor(kind: InteractionKind, theme: Theme): Rgba {
 }
 
 const INTERACTION_LABELS: Record<InteractionKind, string> = {
-  click: "click",
-  link: "link opened",
-  reload: "reload",
-  load: "page load",
+  click: STRINGS.record.click,
+  link: STRINGS.record.linkOpened,
+  reload: STRINGS.record.reload,
+  load: STRINGS.record.pageLoad,
 };
 
 /** hover tooltip above a track marker, centered on the marker's box */
@@ -142,7 +143,7 @@ function DropMark({
   theme: Theme;
 }) {
   const [hover, setHover] = useState(false);
-  const label = `${count} frame${count === 1 ? "" : "s"} dropped`;
+  const label = STRINGS.record.framesDropped(count);
   return (
     <Box
       style={{
@@ -681,7 +682,7 @@ function Track({
             <TrackIcon
               icon="pen"
               color={theme.yellow}
-              label="has edits"
+              label={STRINGS.record.hasEdits}
               x={center}
               trackY={trackY}
               rem={rem}
@@ -838,7 +839,7 @@ export function ReviewToolbar({
       <ShotThumb view={view} rem={rem} theme={theme} />
       {view.keyframeCount > 0 && (
         <Text style={{ fontSize: rem * 0.68, color: theme.disabled, wrap: false, selectable: false }}>
-          {view.keyframeCount > 1 ? "tab to cycle" : "tab to view"}
+          {view.keyframeCount > 1 ? STRINGS.record.tabToCycle : STRINGS.record.tabToView}
         </Text>
       )}
       <RecordToolbarPill view={view} actions={actions} rem={rem} theme={theme} />
@@ -895,7 +896,7 @@ export function RecordToolbarPill({
           selectable: false,
         }}
       >
-        {stopped ? "complete" : "stop"}
+        {stopped ? STRINGS.record.complete : STRINGS.record.stop}
       </Text>
       <Text
         style={{

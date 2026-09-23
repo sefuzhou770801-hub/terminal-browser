@@ -1,3 +1,6 @@
+import { STRINGS } from "../ui/strings";
+import { displayWidth } from "../ui/text-width";
+
 export type Tool = "select" | "pen" | "arrow" | "oval" | "text" | "crop";
 
 export const TOOLS: Tool[] = ["select", "pen", "arrow", "oval", "text", "crop"];
@@ -28,8 +31,8 @@ export type CropScope = "frame" | "video";
 export type HandleId = "nw" | "n" | "ne" | "w" | "e" | "sw" | "s" | "se" | "from" | "to";
 
 export const CROP_SCOPES: { label: string; scope: CropScope }[] = [
-  { label: "crop this frame", scope: "frame" },
-  { label: "crop full video", scope: "video" },
+  { label: STRINGS.record.cropFrame, scope: "frame" },
+  { label: STRINGS.record.cropVideo, scope: "video" },
 ];
 
 const MONO_ADVANCE = 0.6;
@@ -37,7 +40,7 @@ const LINE_HEIGHT = 1.3;
 
 export function measureText(text: string, fontPx: number): { width: number; height: number } {
   const lines = text.split("\n");
-  const chars = Math.max(1, ...lines.map((line) => line.length));
+  const chars = Math.max(1, ...lines.map((line) => displayWidth(line)));
   return { width: chars * fontPx * MONO_ADVANCE, height: lines.length * fontPx * LINE_HEIGHT };
 }
 

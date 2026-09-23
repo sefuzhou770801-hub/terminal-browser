@@ -45,6 +45,7 @@ import {
 } from "./samples";
 import { MAX_RECORDING_MS, Recorder, lastIndexAtOrBefore } from "./recorder";
 import type { RecordActions, RecordInteraction, RecordShot, RecordView } from "./types";
+import { STRINGS } from "../ui/strings";
 
 export interface RecordHost {
   root: { createSurface(): Surface };
@@ -159,7 +160,7 @@ export class RecordSession {
     this.surface = host.root.createSurface();
     this.recorder = new Recorder(target, newRecordingDir(host.page().url));
     this.recorder.onCap = () => {
-      this.host.toast(`recording capped at ${MAX_RECORDING_MS / 60000} minutes`, "done");
+      this.host.toast(STRINGS.toast.recordingCapped(MAX_RECORDING_MS / 60000), "done");
       this.stopReview();
     };
     this.actions = {
@@ -742,7 +743,7 @@ export class RecordSession {
   private ensureFrames(): boolean {
     this.stopCapture();
     if (this.recorder.frames.length > 0) return true;
-    this.host.toast("nothing captured", "failed");
+    this.host.toast(STRINGS.toast.nothingCaptured, "failed");
     this.discard();
     return false;
   }
@@ -931,7 +932,7 @@ export class RecordSession {
     const wasStopped = this.recorder.stopped;
     this.recorder.stop();
     if (!wasStopped && this.recorder.captureError) {
-      this.host.toast(`capture failed: ${this.recorder.captureError}`, "failed");
+      this.host.toast(STRINGS.toast.captureFailed(String(this.recorder.captureError)), "failed");
     }
   }
 
@@ -977,7 +978,7 @@ export class RecordSession {
     const dir = this.recorder.dir;
     const manifestPath = writeProcessingManifest(dir, page);
     host.setClipboard(manifestPath);
-    host.toast("copied to clipboard", "done", manifestPath.replace(os.homedir(), "~"));
+    host.toast(STRINGS.toast.copied, "done", manifestPath.replace(os.homedir(), "~"));
     compositeRecording({
       recorder: this.recorder,
       markup: this.markup,
@@ -990,7 +991,7 @@ export class RecordSession {
       try {
         writeFailedManifest(dir, page, message);
       } catch {}
-      host.toast(`recording failed: ${message}`, "failed");
+      host.toast(STRINGS.toast.recordingFailed(message), "failed");
     });
     this.finish();
   }

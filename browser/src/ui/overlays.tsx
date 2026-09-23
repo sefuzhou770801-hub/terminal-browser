@@ -5,6 +5,7 @@ import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { mix, type Theme } from "./theme";
 import type { ChromeActions, ChromeLayout, DownloadView } from "./types";
+import { STRINGS } from "./strings";
 
 export function FindBar({
   state,
@@ -99,12 +100,12 @@ export function DownloadHud({
   const rem = layout.rem;
   const status =
     download.state === "done"
-      ? "saved"
+      ? STRINGS.download.saved
       : download.state === "failed"
-        ? "failed"
+        ? STRINGS.download.failed
         : download.percent != null
           ? `${download.percent}%`
-          : "downloading";
+          : STRINGS.download.downloading;
   return (
     <Box
       style={{

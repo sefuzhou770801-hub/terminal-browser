@@ -6,6 +6,8 @@ import { usePulse } from "./pulse";
 import { mix, withAlpha } from "./theme";
 import type { Theme } from "./theme";
 import type { ChromeActions, TabRow } from "./types";
+import { STRINGS } from "./strings";
+import { displayWidth } from "./text-width";
 
 const ANIM_MS = 200;
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
@@ -149,7 +151,7 @@ export function TabStrip({
   const pointerIn = useRef(false);
   const dotPulse = usePulse(tabs.some((tab) => tab.agentControlled && !tab.active));
   const label = (tab: TabRow) =>
-    tab.active ? activeLabel || tab.title || "new tab" : tab.title || "new tab";
+    tab.active ? activeLabel || tab.title || STRINGS.tabs.newTab : tab.title || STRINGS.tabs.newTab;
   const charW = rem * 0.82 * 0.6;
   const slotW = rem * 0.85;
   const padX = rem * 0.7;
@@ -164,7 +166,7 @@ export function TabStrip({
   for (const tab of tabs) {
     if (tab.active) continue;
     const intrinsic =
-      padX * 2 + slotW + innerGap + Math.min(label(tab).length, 24) * charW;
+      padX * 2 + slotW + innerGap + Math.min(displayWidth(label(tab)), 24) * charW;
     const w = Math.min(Math.max(intrinsic, minInactive), capInactive);
     inactiveWidths.set(tab.id, w);
     sum += w;

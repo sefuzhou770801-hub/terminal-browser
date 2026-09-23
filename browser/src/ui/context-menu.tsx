@@ -1,6 +1,7 @@
 import { Box, Image, Path, Text } from "@zenbu-labs/pixel";
 import type { Theme } from "./theme";
 import type { ChromeActions, ChromeLayout, PageMenuIcon, PageMenuItem, PageMenuView } from "./types";
+import { displayWidth } from "./text-width";
 
 export function PageContextMenu({
   view,
@@ -20,9 +21,9 @@ export function PageContextMenu({
   const hasIcons = view.items.some((item) => item.icon);
   const width = Math.round(
     view.items.reduce((widest, item) => {
-      let row = rem * 1.4 + item.label.length * charW;
+      let row = rem * 1.4 + displayWidth(item.label) * charW;
       if (hasIcons) row += rem * 1.2;
-      if (item.shortcut) row += rem * 0.6 + item.shortcut.length * shortcutW;
+      if (item.shortcut) row += rem * 0.6 + displayWidth(item.shortcut) * shortcutW;
       return Math.max(widest, row);
     }, rem * 9),
   );

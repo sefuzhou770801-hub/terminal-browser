@@ -19,6 +19,7 @@ import { PopupMenu, ShadeAround } from "./record-widgets";
 import { withAlpha } from "./theme";
 import type { Theme } from "./theme";
 import type { ChromeActions, ChromeLayout } from "./types";
+import { STRINGS } from "./strings";
 
 
 const TEXT_SCRIM: Rgba = [15, 17, 22, 255];
@@ -231,7 +232,7 @@ function LinkToast({ view, toView }: { view: MarkupCanvasView; toView: (p: Vec) 
   if (urlW > maxW) urlPx = Math.max(8, (urlPx * maxW) / urlW);
   const pad = titlePx * 0.9;
   const cardW =
-    Math.max(measureText(toast.url, urlPx).width, measureText("link opened", titlePx).width) +
+    Math.max(measureText(toast.url, urlPx).width, measureText(STRINGS.record.linkOpened, titlePx).width) +
     pad * 2;
   const cardH = pad * 1.8 + titlePx * 1.3 + urlPx * 1.3;
   const origin = toView({ x: (frameW - cardW) / 2, y: titlePx * 1.2 });
@@ -260,7 +261,7 @@ function LinkToast({ view, toView }: { view: MarkupCanvasView; toView: (p: Vec) 
           selectable: false,
         }}
       >
-        link opened
+        {STRINGS.record.linkOpened}
       </Text>
       <Text
         style={{
@@ -759,7 +760,7 @@ function Toolbar({
           >
             <Icon icon="camera" size={rem * 0.95} color={theme.muted} />
             <Text style={{ fontSize: rem * 0.72, color: theme.fg, wrap: false, selectable: false }}>
-              screenshot
+              {STRINGS.record.screenshot}
             </Text>
             <Text style={{ fontSize: rem * 0.65, color: theme.muted, wrap: false, selectable: false }}>
               enter

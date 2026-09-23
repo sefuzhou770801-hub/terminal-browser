@@ -5,6 +5,7 @@ import type { WebViewState } from "@zenbu-labs/pixel";
 import { Icon } from "./icons";
 import type { Theme } from "./theme";
 import type { ChromeActions, ChromeLayout, NewTabView, PaletteView } from "./types";
+import { STRINGS } from "./strings";
 
 function Backdrop({ layout, onClose }: { layout: ChromeLayout; onClose(): void }) {
   return (
@@ -108,7 +109,7 @@ export function PaletteCard({
               selectable: false,
             }}
           >
-            no matching actions
+            {STRINGS.palette.noMatches}
           </Text>
         )}
         {view.items.map((item, i) => (

@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { STRINGS } from "../ui/strings";
 
 export type Run = (command: string, args: string[]) => Promise<string>;
 
@@ -25,11 +26,11 @@ export function closablePane(
 }
 
 export async function closeOwnPane(pane: ClosablePane, tty: string | null, run: Run = runCommand): Promise<void> {
-  if (!tty) throw new Error("could not tell which pane this browser is in");
+  if (!tty) throw new Error(STRINGS.pane.unknownPane);
   const info = JSON.parse(await run(pane.bin, ["pane", "process-info", "--pane", pane.id]));
   const shellPid = info?.result?.process_info?.shell_pid;
-  if (shellPid == null) throw new Error(`herdr did not report a shell for pane ${pane.id}`);
+  if (shellPid == null) throw new Error(STRINGS.pane.noShell(pane.id));
   const shellTty = (await run("ps", ["-o", "tty=", "-p", String(shellPid)])).trim();
-  if (`/dev/${shellTty}` !== tty) throw new Error(`pane ${pane.id} is not the pane this browser runs in`);
+  if (`/dev/${shellTty}` !== tty) throw new Error(STRINGS.pane.notOwnPane(pane.id));
   await run(pane.bin, ["pane", "close", pane.id]);
 }
