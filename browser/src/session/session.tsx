@@ -1186,7 +1186,7 @@ class Session {
 
   private paneMenuItems(): PageMenuItem[] {
     if (!this.closablePane) return [];
-    return [{ id: "close-pane", label: "close pane", enabled: true, shortcut: "" }];
+    return [{ id: "close-pane", label: "关闭窗格", enabled: true, shortcut: "" }];
   }
 
   private async closePane() {
