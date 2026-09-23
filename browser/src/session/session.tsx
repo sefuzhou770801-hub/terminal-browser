@@ -60,6 +60,8 @@ import type { KeyBinding } from "./keybindings";
 import { clampDevtoolsFraction, computeLayout, dividerFraction, recordBarHeight } from "./layout";
 import type { DevtoolsPlacement, SurfaceLayout } from "./layout";
 import { fetchSuggestions } from "./suggest";
+import { closablePane, closeOwnPane } from "./own-pane";
+import type { ClosablePane } from "./own-pane";
 import { TabManager } from "./tabs";
 import type { Tab } from "./tabs";
 
@@ -213,6 +215,7 @@ class Session {
   private readonly copyOnSelect: boolean;
   private readonly grabIcon = bundledAsset(path.join("react-grab", "logo.png"));
   private readonly agentPanes: AgentPaneFinder;
+  private readonly closablePane: ClosablePane | null;
   private shownRecord: RecordSession | null = null;
   private recordStarting = false;
   private readonly defaultUrl: string;
@@ -231,6 +234,11 @@ class Session {
       self: () => this.findOwnPane(),
       embedded: embeddedAgent(ctx.env.TERMINAL_BROWSER_AGENT_BRIDGE, ctx.env.TERMINAL_BROWSER_AGENT_TOKEN),
     });
+    this.closablePane = closablePane(
+      this.terminal?.name ?? null,
+      ctx.env,
+      flagValue(this.argv, "--split-dir") != null,
+    );
     this.sessionFlags = {
       clipboardRead: this.argv.includes("--allow-clipboard-read"),
     };
@@ -983,6 +991,9 @@ class Session {
     const handle = tab?.ref.current;
     if (!menu || !tab || !handle) return;
     switch (id) {
+      case "close-pane":
+        void this.closePane();
+        return;
       case "grab":
         void this.toggleGrab();
         return;
@@ -1103,7 +1114,23 @@ class Session {
         enabled: true,
         shortcut: bindingLabel(this.devtoolsBinding),
       },
+      ...this.paneMenuItems(),
     ];
+  }
+
+  private paneMenuItems(): PageMenuItem[] {
+    if (!this.closablePane) return [];
+    return [{ id: "close-pane", label: "close pane", enabled: true, shortcut: "" }];
+  }
+
+  private async closePane() {
+    const pane = this.closablePane;
+    if (!pane) return;
+    try {
+      await closeOwnPane(pane, this.ctx.tty ?? null);
+    } catch (error) {
+      this.showToast(error instanceof Error ? error.message : String(error), "failed");
+    }
   }
 
   private pageMenuView(): PageMenuView | null {
